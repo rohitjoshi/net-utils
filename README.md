@@ -5,9 +5,20 @@ Provides networking utility including TCP/SSL connection and connection manager.
 
 Here is an example of using connection pool.
 
-	use std::default::Default;
-	use net::config;
-	use net::poolmgr;
+Define the below dependency in Cargo.toml
+
+    [dependencies.net-utils]
+    git = "https://github.com/rohitjoshi/net-utils.git"
+
+Here is your main.rs
+
+	 extern crate "net-utils" as utils;
+         use std::default::Default;
+         use std::sync::{ Arc, Mutex };
+
+
+         use utils::net::config;
+         use utils::net::poolmgr;
 	fn main() {
            let mut cfg : config::Config = Default::default();
             //set port to 80
@@ -27,11 +38,14 @@ Here is an example of using connection pool.
 Here is above example used in multi-threded enviornment
 
         
+    extern crate "net-utils" as utils;
     use std::default::Default;
     use std::sync::{ Arc, Mutex };
-    use net::config;
-    use net::poolmgr;
-    	 
+
+
+    use utils::net::config;
+    use utils::net::poolmgr;
+
     fn main() {
         let mut cfg : config::Config = Default::default();
         //set port to 80
