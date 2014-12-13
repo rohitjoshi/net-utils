@@ -12,28 +12,28 @@ Define the below dependency in Cargo.toml
 
 Here is your main.rs
 
-	 extern crate "net-utils" as utils;
-         use std::default::Default;
-         use std::sync::{ Arc, Mutex };
+    extern crate "net-utils" as utils;
+    use std::default::Default;
+    use std::sync::{ Arc, Mutex };
 
 
-         use utils::net::config;
-         use utils::net::poolmgr;
-	 fn main() {
-           let mut cfg : config::Config = Default::default();
-            //set port to 80
-            cfg.port= Some(80);
-            //set host to
-            cfg.server = Some("google.com".to_string());
-            let mut pool = poolmgr::ConnectionPool::new(2, 20, true, &cfg);
-            //get the connection
-            let mut conn = pool.aquire().unwrap();
-            conn.writer.write_str("GET google.com\r\n").unwrap();
-            conn.writer.flush().unwrap();
-            let r = conn.reader.read_line();
-            println!("Received {}", r);
-            pool.release(conn);
-       }
+    use utils::net::config;
+    use utils::net::poolmgr;
+    fn main() {
+        let mut cfg : config::Config = Default::default();
+        //set port to 80
+        cfg.port= Some(80);
+        //set host to
+        cfg.server = Some("google.com".to_string());
+        let mut pool = poolmgr::ConnectionPool::new(2, 20, true, &cfg);
+        //get the connection
+        let mut conn = pool.aquire().unwrap();
+        conn.writer.write_str("GET google.com\r\n").unwrap();
+        conn.writer.flush().unwrap();
+        let r = conn.reader.read_line();
+        println!("Received {}", r);
+        pool.release(conn);
+    }
 
 Here is above example used in multi-threded enviornment
 
