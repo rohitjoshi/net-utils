@@ -7,8 +7,6 @@
 #[cfg(feature = "ssl")] extern crate openssl;
 #[phase(plugin, link)]extern crate log;
 
-pub mod config;
-pub mod conn;
-pub mod poolmgr;
+pub mod net;
 
 

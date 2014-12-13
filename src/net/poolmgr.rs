@@ -5,8 +5,8 @@ use std::io::{IoResult,  IoError, IoErrorKind};
 use std::sync::{ Arc, Mutex};
 use std::default::Default;
 
-use conn;
-use config;
+use net::conn;
+use net::config;
 
 
 
@@ -137,7 +137,7 @@ pub mod test {
     use std::sync::{ Arc, Mutex };
     use std::cell::RefCell;
     use std::rc::Rc;
-    use config;
+    use net::config;
     #[test]
     fn test_new() {
         let  cfg : config::Config = Default::default();

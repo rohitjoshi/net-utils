@@ -6,7 +6,7 @@ use std::io::{BufferedReader, BufferedWriter, IoResult, InvalidInput, IoError, I
 #[cfg(feature = "ssl")] use openssl::ssl::{SslContext, SslMethod, SslStream};
 #[cfg(feature = "ssl")] use openssl::ssl::error::SslError;
 //use std::bool;
-use config;
+use net::config;
 //pub mod config;
 
 
