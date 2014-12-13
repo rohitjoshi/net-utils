@@ -1,0 +1,12 @@
+[root]
+name = "net-utils-test"
+version = "0.0.1"
+dependencies = [
+ "net-utils 0.0.1 (git+https://github.com/rohitjoshi/net-utils.git)",
+]
+
+[[package]]
+name = "net-utils"
+version = "0.0.1"
+source = "git+https://github.com/rohitjoshi/net-utils.git#fca5638bf194c78a4131eda89f30a80d0459a084"
+

@@ -1,0 +1,8 @@
+[package]
+
+name = "net-utils-test"
+version = "0.0.1"
+authors = ["Rohit Joshi <rohit.joshi@gmail.com>"]
+
+[dependencies.net-utils]
+git = "https://github.com/rohitjoshi/net-utils.git"
