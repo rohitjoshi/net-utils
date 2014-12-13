@@ -1,5 +1,5 @@
 //! A simple, connection pool library.
-#![crate_name = "net-utils"]
+#![crate_name = "netutils"]
 #![crate_type = "lib"]
 #![unstable]
 #![warn(missing_docs)]
