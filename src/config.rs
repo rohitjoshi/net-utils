@@ -1,0 +1,60 @@
+//!Configuration for connection object
+#![unstable]
+use std::default::Default;
+
+
+
+///Configuration data.
+#[deriving( Clone)]
+#[unstable]
+pub struct Config {
+	/// The server to connect to.
+	pub server: Option<String>,
+	/// The port to connect to.
+	pub port: Option<u16>,
+	/// Connect timeout.
+	pub connect_timeout: Option<u64>,
+	///If true, it will assume ssl is enabled
+	pub use_ssl: Option<bool>,
+	/// Certificate File
+	pub certificate_file: Option<Path>,
+	/// Private Key File
+	pub private_key_file: Option<Path>,
+	/// CA File
+	pub ca_file: Option<Path>,
+	/// Verify certificate
+	pub verify: Option<bool>,
+	/// Verify depth
+	pub verify_depth: Option<uint>
+}
+
+impl Default for Config {
+  fn default () -> Config {
+    Config {
+    	server : Some("localhost".to_string()),
+    	port: Some(21950),
+    	connect_timeout: Some(30_000),
+    	use_ssl: Some(false),
+    	certificate_file: None,
+    	private_key_file: None,
+    	ca_file: None,
+    	verify: None,
+    	verify_depth: None,
+     }
+  }
+}
+
+#[cfg(test)]
+pub mod test {
+	use std::default::Default;
+    #[test]
+    fn test_config() {    
+        let c = super::Config {
+            server: Some("localhost".to_string()), 
+            port: Some(2195),
+             ..Default::default()};   
+          assert_eq!(c.port, Some(2195)); 
+          assert_eq!(c.connect_timeout, Some(30_000)); 
+    }
+}
+

@@ -1,0 +1,42 @@
+[root]
+name = "net-utils"
+version = "0.0.1"
+dependencies = [
+ "openssl 0.2.3 (git+https://github.com/sfackler/rust-openssl.git)",
+]
+
+[[package]]
+name = "libressl-pnacl-sys"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "pnacl-build-helper 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "openssl"
+version = "0.2.3"
+source = "git+https://github.com/sfackler/rust-openssl.git#ae9e2b1e257a744fa538cf3db299cac0584b4417"
+dependencies = [
+ "openssl-sys 0.2.3 (git+https://github.com/sfackler/rust-openssl.git)",
+]
+
+[[package]]
+name = "openssl-sys"
+version = "0.2.3"
+source = "git+https://github.com/sfackler/rust-openssl.git#ae9e2b1e257a744fa538cf3db299cac0584b4417"
+dependencies = [
+ "libressl-pnacl-sys 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "pkg-config"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "pnacl-build-helper"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
