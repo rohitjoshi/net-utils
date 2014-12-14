@@ -66,3 +66,8 @@ Here is above example used in multi-threded enviornment
            });
         }
     }
+    
+To enable SSL connectivity,  compile using --feature ssl 
+e.g.  For executing SSL test cases, run 
+    cargo test --features ssl
+
