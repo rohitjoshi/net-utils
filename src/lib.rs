@@ -47,7 +47,7 @@ let mut cfg : config::Config = Default::default();
     conn.writer.write_str("GET google.com\r\n").unwrap();
     conn.writer.flush().unwrap();
     let r = conn.reader.read_line();
-    warn!("SSL Received {}", r);
+    debug!("SSL Received {}", r);
     pool.release(conn);
 }
 }

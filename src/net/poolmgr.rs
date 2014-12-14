@@ -56,7 +56,7 @@ impl  ConnectionPool {
          self.idle_conns.len()
 
     }
- 
+    /// Initial the connection pool
     pub fn init(&mut self) -> bool {
        //  let mut idleconn = self.idle_conns.lock();
         //  let  idleconn = self.idle_conns;
@@ -74,12 +74,14 @@ impl  ConnectionPool {
         }
         return true;
     }
-    ///releae connection
+
+
+    ///Releae connection
     pub fn release(&mut self, conn: conn::Connection ) {
        // let mut idleconn = self.idle_conns.lock();
        //  let  idleconn = self.idle_conns;
         let total_count = self.idle_conns.len() + self.conns_inuse;
-        warn!("Total_count: {}", total_count);
+        debug!("Total_count: {}", total_count);
         if total_count <= self.max_conns  {
             self.idle_conns.push_back(conn);
             self.conns_inuse -= 1;
@@ -88,10 +90,16 @@ impl  ConnectionPool {
          {
           //  let c = conn;
           self.conns_inuse -= 1;
-          warn!("It should trigger drop connection");
+          debug!("It should trigger drop connection");
         }
     }
 
+    ///Drop connection.  Use only if discconect.
+    pub fn drop(&mut self, conn: conn::Connection ) {
+          self.conns_inuse -= 1;
+    }
+
+   
     /// Aquire Connection
     pub fn aquire(&mut self) -> IoResult<conn::Connection> {
        // let mut idleconn = self.idle_conns.lock();
@@ -105,7 +113,7 @@ impl  ConnectionPool {
                 return Ok(conn);
             }
        }
-       warn!("Allocating new connection");
+       debug!("Allocating new connection");
        let total_count = self.idle_conns.len() + self.conns_inuse;
        if total_count >= self.max_conns  && self.tmp_conn_allowed == false {
            return Err(IoError {
@@ -156,9 +164,9 @@ pub mod test {
          let mut c1 = pool.aquire().unwrap();
          c1.writer.write_str("GET google.com\r\n").unwrap();
          c1.writer.flush().unwrap();
-          warn!("reading_u8");
+          debug!("reading_u8");
          let r = c1.reader.read_line();
-         warn!("reading_u8: {}", r);
+         debug!("reading_u8: {}", r);
 
          
     }
@@ -205,7 +213,7 @@ pub mod test {
         pool.release(c3);
          assert_eq!(pool.idle_conns_length(), 2);
        }
-       warn!("Only one is released");
+       debug!("Only one is released");
     }
 
     #[test]
@@ -240,7 +248,7 @@ pub mod test {
             
        }
       // assert_eq!(pool.idle_conns_length(), 2);
-       warn!("Only one is released");
+       debug!("Only one is released");
     }
 
     #[test]

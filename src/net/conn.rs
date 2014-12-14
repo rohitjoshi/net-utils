@@ -38,6 +38,16 @@ impl  Connection {
         }
     }
 
+    /// Creates a  TCP/SSL connection to the specified server. If already connected, it will drop and reconnect
+    #[experimental]
+    pub fn reconnect(&mut self) ->  IoResult<Connection> {
+        if self.config.use_ssl.unwrap_or(false)  {
+            Connection::connect_ssl_internal(&self.config)
+        }else {
+            Connection::connect_internal(&self.config)
+        }
+    }
+
     
     /// Creates a TCP connection with an optional timeout.
     #[experimental]
@@ -207,7 +217,7 @@ impl Writer for NetStream {
 impl Drop for Connection {
     ///drop method 
     fn drop(&mut self) {
-        warn!("Dropping connection!");
+        debug!("Dropping connection!");
     }
 }
 

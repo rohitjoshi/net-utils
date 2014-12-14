@@ -23,7 +23,7 @@ fn main() {
             conn.writer.write_str("GET google.com\r\n").unwrap();
             conn.writer.flush().unwrap();
             let r = conn.reader.read_line();
-            println!("Received {}", r);
+            debug!("Received {}", r);
             pool.lock().release(conn);
        });
     }
