@@ -1,5 +1,5 @@
 [package]
-name = "netutils"
+name = "net-utils"
 version = "0.0.1"
 authors = ["Rohit Joshi <rohit.joshi@gmail.com>"]
 
