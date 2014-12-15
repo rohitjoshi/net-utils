@@ -82,7 +82,7 @@ impl  ConnectionPool {
        //  let  idleconn = self.idle_conns;
         let total_count = self.idle_conns.len() + self.conns_inuse;
         debug!("Total_count: {}", total_count);
-        if total_count <= self.max_conns  {
+        if total_count <= self.max_conns && conn.is_valid() {
             self.idle_conns.push_back(conn);
             self.conns_inuse -= 1;
         }else 
@@ -99,7 +99,7 @@ impl  ConnectionPool {
           self.conns_inuse -= 1;
     }
 
-   
+
     /// Aquire Connection
     pub fn aquire(&mut self) -> IoResult<conn::Connection> {
        // let mut idleconn = self.idle_conns.lock();
@@ -127,7 +127,6 @@ impl  ConnectionPool {
         match conn {
             Ok(c) => {
                 self.conns_inuse += 1;
-                
              //   self.inuse_conns.push_back(&c);
                 return Ok(c);
             },
@@ -162,6 +161,7 @@ pub mod test {
         assert_eq!(pool.init(), true);
         assert_eq!(pool.idle_conns_length(), 2);
          let mut c1 = pool.aquire().unwrap();
+         assert_eq!(c1.is_valid(), true);
          c1.writer.write_str("GET google.com\r\n").unwrap();
          c1.writer.flush().unwrap();
           debug!("reading_u8");
@@ -182,6 +182,7 @@ pub mod test {
             let pool = pool.clone();
             spawn(proc() {
                 let mut conn = pool.lock().aquire().unwrap();
+
                 conn.writer.write_str("GET google.com\r\n").unwrap();
                 conn.writer.flush().unwrap();
                 let r = conn.reader.read_line();

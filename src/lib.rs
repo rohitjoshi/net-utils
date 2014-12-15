@@ -26,6 +26,7 @@ let mut cfg : config::Config = Default::default();
     let mut pool = poolmgr::ConnectionPool::new(2, 20, true, &cfg);
    //get the connection
     let mut conn = pool.aquire().unwrap();
+     assert_eq!(conn.is_valid(), true);
     conn.writer.write_str("GET google.com\r\n").unwrap();
     conn.writer.flush().unwrap();
     let r = conn.reader.read_line();
@@ -44,6 +45,7 @@ let mut cfg : config::Config = Default::default();
     let mut pool = poolmgr::ConnectionPool::new(2, 20, true, &cfg);
    //get the connection
     let mut conn = pool.aquire().unwrap();
+     assert_eq!(conn.is_valid(), true);
     conn.writer.write_str("GET google.com\r\n").unwrap();
     conn.writer.flush().unwrap();
     let r = conn.reader.read_line();
