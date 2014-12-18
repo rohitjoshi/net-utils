@@ -256,33 +256,62 @@ pub mod test {
         info!("test_new ended---------");
     }
 
+    ///test google
+    fn test_google() {
+        log::set_logger(box super::CustLogger { handle: stderr() } );
+        info!("test_lib started---------");
+        let mut cfg : config::Config = Default::default();
+        cfg.port= Some(80); //Some(io::test::next_test_port());
+        cfg.server = Some("google.com".to_string()); //Some("127.0.0.1".to_string());
+ 
+        let mut pool = super::ConnectionPool::new(2, 20, true, &cfg);
+        let mut conn = pool.aquire().unwrap();
+        assert_eq!(conn.is_valid(), true);
+        conn.writer.write_str("GET google.com\r\n").unwrap();
+        conn.writer.flush().unwrap();
+        let r = conn.reader.read_line();
+        println!("Received {}", r);
+        pool.release(conn);
+        assert_eq!(pool.idle_conns_length(), 0);
+        info!("test_lib ended---------");
+
+    }
+
     #[test]
     fn test_init() {
-      log::set_logger(box super::CustLogger { handle: stderr() } );
-       info!("test_init started---------");
+        log::set_logger(box super::CustLogger { handle: stderr() } );
+        info!("test_init started---------");
+        
         let mut cfg : config::Config = Default::default();
         cfg.port= Some(test::next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
+
         let (tx, rx): (Sender<int>, Receiver<int>) = channel();
-        spawn(move || {
-          listen_ip4_localhost(listen_port, rx);
-        });
-        let mut pool = super::ConnectionPool::new(1, 5, false, &cfg);
-        assert_eq!(pool.init(), true);
-        assert_eq!(pool.idle_conns_length(), 1);
-         let mut c1 = pool.aquire().unwrap();
-         assert_eq!(c1.is_valid(), true);
-         c1.writer.write_str("GET google.com\r\n").unwrap();
-         c1.writer.flush().unwrap();
+
+        {
+          spawn(move || {
+            listen_ip4_localhost(listen_port, rx);
+          });
+        
+          let mut pool = super::ConnectionPool::new(1, 5, false, &cfg);
+          assert_eq!(pool.init(), true);
+          assert_eq!(pool.idle_conns_length(), 1);
+          let mut c1 = pool.aquire().unwrap();
+          assert_eq!(c1.is_valid(), true);
+          c1.writer.write_str("GET google.com\r\n").unwrap();
+          c1.writer.flush().unwrap();
+        
           debug!("reading_u8");
-         let r = c1.reader.read_line();
-         debug!("reading_u8: {}", r);
-         sleep(Duration::milliseconds(1000));
+          let r = c1.reader.read_line();
+          debug!("reading_u8: {}", r);
+          sleep(Duration::milliseconds(1000));
           pool.release_all();
           assert_eq!(pool.idle_conns_length(), 0);
           tx.send(0);
-         info!("test_init ended---------");
+        }
+       
+        info!("test_init ended---------");
          
     }
 
