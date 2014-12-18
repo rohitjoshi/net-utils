@@ -56,7 +56,7 @@ Here is above example used in multi-threded enviornment
         let pool = Arc::new(Mutex::new(pool));
         for _ in range(0u, 2) {
             let pool = pool.clone();
-            spawn(proc() {
+            spawn(move || {
                 let mut conn = pool.lock().aquire().unwrap();
                 conn.writer.write_str("GET google.com\r\n").unwrap();
                 conn.writer.flush().unwrap();
