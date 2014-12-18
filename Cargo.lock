@@ -2,7 +2,7 @@
 name = "net-utils"
 version = "0.0.1"
 dependencies = [
- "openssl 0.2.3 (git+https://github.com/sfackler/rust-openssl.git)",
+ "openssl 0.2.5 (git+https://github.com/sfackler/rust-openssl.git)",
 ]
 
 [[package]]
@@ -15,24 +15,24 @@ dependencies = [
 
 [[package]]
 name = "openssl"
-version = "0.2.3"
-source = "git+https://github.com/sfackler/rust-openssl.git#9754b8e47db5faff2930ed070527d2d71e76e094"
+version = "0.2.5"
+source = "git+https://github.com/sfackler/rust-openssl.git#88b753d3feeab5de71c5fdc834c0cc2dc37ae42e"
 dependencies = [
- "openssl-sys 0.2.3 (git+https://github.com/sfackler/rust-openssl.git)",
+ "openssl-sys 0.2.5 (git+https://github.com/sfackler/rust-openssl.git)",
 ]
 
 [[package]]
 name = "openssl-sys"
-version = "0.2.3"
-source = "git+https://github.com/sfackler/rust-openssl.git#9754b8e47db5faff2930ed070527d2d71e76e094"
+version = "0.2.5"
+source = "git+https://github.com/sfackler/rust-openssl.git#88b753d3feeab5de71c5fdc834c0cc2dc37ae42e"
 dependencies = [
  "libressl-pnacl-sys 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "pkg-config 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "pkg-config"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]

@@ -61,6 +61,7 @@ impl  Connection {
                     return true; 
                 } 
             },  
+             #[cfg(feature = "ssl")]
             &NetStream::SslTcpStream (ref ssl) =>  {
               debug!("SSL FD:{}", ssl.get_ref().as_raw_fd());
               if ssl.get_ref().as_raw_fd() < 0 {
@@ -119,6 +120,8 @@ impl  Connection {
     }
     
     /// Set the SSL certs and verification options
+     #[experimental]
+    #[cfg(feature = "ssl")]
     fn set_ssl_options(ssl: &mut SslContext, config: &config::Config) -> Result<(),IoError> {
          //verify peer
         if config.verify.unwrap_or(false) {
@@ -212,7 +215,18 @@ impl Writer for NetStream {
 impl Drop for Connection {
     ///drop method 
     fn drop(&mut self) {
-        debug!("Dropping connection!");
+        info!("Dropping connection!");
+        match self.reader.get_mut() {
+             &NetStream::UnsecuredTcpStream(ref mut stream) => {
+                 let mut rr = stream.close_read();
+                 let mut wr = stream.close_write();
+            },  
+             #[cfg(feature = "ssl")]
+            &NetStream::SslTcpStream (ref mut ssl) =>  {           
+              let rr = ssl.get_mut().close_read();
+              let wr = ssl.get_mut().close_write();
+            },       
+        }
     }
 }
 
