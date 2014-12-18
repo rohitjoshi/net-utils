@@ -215,7 +215,7 @@ impl Writer for NetStream {
 impl Drop for Connection {
     ///drop method 
     fn drop(&mut self) {
-        info!("Dropping connection!");
+        info!("Drop for Connection:Dropping connection!");
         match self.reader.get_mut() {
              &NetStream::UnsecuredTcpStream(ref mut stream) => {
                  let mut rr = stream.close_read();

@@ -103,9 +103,11 @@ impl  ConnectionPool {
     }
 
     pub fn release_all(& self) {
+      info!("release_all called");
+      info!("It should trigger drop connection");
       self.idle_conns.lock().clear();
       self.conns_inuse.store(0, Ordering::Relaxed);
-       let total_count = self.idle_conns.lock().len() + self.conns_inuse.load(Ordering::Relaxed);
+      let total_count = self.idle_conns.lock().len() + self.conns_inuse.load(Ordering::Relaxed);
       info!("release_all called: Total_count: {}", total_count);
     }
 
@@ -113,20 +115,26 @@ impl  ConnectionPool {
     ///Releae connection
     pub fn release(& self, conn: conn::Connection ) {
  
-        let total_count = self.idle_conns.lock().len() + self.conns_inuse.load(Ordering::Relaxed);
-        warn!("release(): Total_count: {}", total_count);
-        if total_count <= self.max_conns && conn.is_valid() {
+        let total_count = self.idle_conns.lock().len();
+        info!("release(): idle connection: {}", total_count);
+        if total_count < self.max_conns && conn.is_valid()  {
+            info!("Pushing back to ideal_conns");
             self.idle_conns.lock().push_back(conn);
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
-        }else 
+        }else if  !conn.is_valid() {
+         //    let c = conn;
+           self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
+           info!("Connection not valid. It should trigger drop connection");
+        }
+        else 
         //object goes out of scope
          {
-            let c = conn;
+          //  let c = conn;
            self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
            info!("It should trigger drop connection");
         }
        
-        warn!("release() end: Total_count: {}", self.idle_conns.lock().len() + self.conns_inuse.load(Ordering::Relaxed));
+        info!("release() end: Total_count: {}", self.idle_conns.lock().len() + self.conns_inuse.load(Ordering::Relaxed));
       
     }
 
@@ -141,7 +149,7 @@ impl  ConnectionPool {
 
 
     /// Aquire Connection
-    pub fn aquire(& self) -> IoResult<conn::Connection> {
+    pub fn acquire(& self) -> IoResult<conn::Connection> {
        // let mut idleconn = self.idle_conns.lock().lock();
         // let  idleconn = self.idle_conns;
 
@@ -205,12 +213,15 @@ pub mod test {
         let uri = format!("127.0.0.1:{}", port);
         let mut acceptor = TcpListener::bind(uri.as_slice()).listen().unwrap();
        // let mut acceptor = listener.listen();
+       acceptor.set_timeout(Some(250));
         for  stream in acceptor.incoming() {
+         
            match stream {
-              Err(e) => warn!("Accept err {}", e),
+              Err(e) => debug!("Accept err {}", e),
               Ok(stream) => {
+                 info!("Got new connection on port {}", port);
                   spawn(move || {
-                    debug!("{}", handle_client(stream));
+                    info!("{}", handle_client(stream));
                   })
               }
             }
@@ -231,15 +242,18 @@ pub mod test {
            loop {
                let got = try!(stream.read(&mut buf));
                 if got == 0 {
-                   // Is it possible? Or IoError will be raised anyway?
+                   warn!("handle_client: Received: 0");
+                   stream.write_str("Fail to read\r\n");
+                   stream.flush().unwrap();
                    break;
                 }else {
-                warn!("Test Server: Received: {}. Sending it back", buf);
-               stream.write(buf.slice(0, got));
-               break;
-             }
-         }
-        Ok(())
+                    warn!("handle_client: Received: {}. Sending it back", buf);
+                    stream.write(buf.slice(0, got));
+                   
+                  break;
+                }
+            }
+            Ok(())
       }
         
 
@@ -265,7 +279,7 @@ pub mod test {
         cfg.server = Some("google.com".to_string()); //Some("127.0.0.1".to_string());
  
         let mut pool = super::ConnectionPool::new(2, 20, true, &cfg);
-        let mut conn = pool.aquire().unwrap();
+        let mut conn = pool.acquire().unwrap();
         assert_eq!(conn.is_valid(), true);
         conn.writer.write_str("GET google.com\r\n").unwrap();
         conn.writer.flush().unwrap();
@@ -287,28 +301,36 @@ pub mod test {
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
 
-        let (tx, rx): (Sender<int>, Receiver<int>) = channel();
+       
 
         {
+            info!("test_init starting channel---------");
+           let (tx, rx): (Sender<int>, Receiver<int>) = channel();
+           info!("test_init spawning thread---------");
           spawn(move || {
+            info!("test_init calling listen_Ip4_localhost with port {}", listen_port);
             listen_ip4_localhost(listen_port, rx);
           });
-        
+          sleep(Duration::milliseconds(500));
+          info!("test_init starting connection pool");
           let mut pool = super::ConnectionPool::new(1, 5, false, &cfg);
           assert_eq!(pool.init(), true);
           assert_eq!(pool.idle_conns_length(), 1);
-          let mut c1 = pool.aquire().unwrap();
+          let mut c1 = pool.acquire().unwrap();
+           info!("test_init acquire connection");
           assert_eq!(c1.is_valid(), true);
+           info!("test_init send data");
           c1.writer.write_str("GET google.com\r\n").unwrap();
-          c1.writer.flush().unwrap();
-        
-          debug!("reading_u8");
+          c1.writer.flush().unwrap();       
+          info!("reading line");
           let r = c1.reader.read_line();
-          debug!("reading_u8: {}", r);
-          sleep(Duration::milliseconds(1000));
+          info!("reading received: {}", r);
+           info!("sending 0 to channel");
+          tx.send(0);
+          info!("releasing all");
           pool.release_all();
           assert_eq!(pool.idle_conns_length(), 0);
-          tx.send(0);
+          
         }
        
         info!("test_init ended---------");
@@ -327,12 +349,12 @@ pub mod test {
         spawn(move || {
           listen_ip4_localhost(listen_port, rx);
         });
-        let  pool = super::ConnectionPool::new(2, 20, true, &cfg);
+        let  pool = super::ConnectionPool::new(2, 5, true, &cfg);
         let pool_shared = Arc::new(pool);
-        for _ in range(0u, 2) {
+        for _ in range(0u, 6) {
             let pool = pool_shared.clone();
             spawn(move || {
-                let mut conn = pool.aquire().unwrap();
+                let mut conn = pool.acquire().unwrap();
 
                 conn.writer.write_str("GET google.com\r\n").unwrap();
                 conn.writer.flush().unwrap();
@@ -341,7 +363,8 @@ pub mod test {
                 pool.release(conn);
            });
         }
-        sleep(Duration::milliseconds(1000));
+         sleep(Duration::milliseconds(1000));
+         assert_eq!(pool_shared.idle_conns_length(), 5);
          pool_shared.release_all();
          assert_eq!(pool_shared.idle_conns_length(), 0);
          tx.send(0);
@@ -349,9 +372,9 @@ pub mod test {
     }
 
     #[test]
-    fn test_aquire_relese() {
+    fn test_acquire_release_1() {
       log::set_logger(box super::CustLogger { handle: stderr() } );
-        info!("test_aquire_relese started---------");
+        info!("test_acquire_release started---------");
         let mut cfg : config::Config = Default::default();
 
         cfg.port= Some(test::next_test_port());
@@ -366,30 +389,30 @@ pub mod test {
           assert_eq!(pool.init(), true);
           assert_eq!(pool.idle_conns_length(), 2);
         
-          let c1 = pool.aquire().unwrap();
+          let c1 = pool.acquire().unwrap();
           assert_eq!(pool.idle_conns_length(), 1);
-          let c2 = pool.aquire().unwrap();
+          let c2 = pool.acquire().unwrap();
           assert_eq!(pool.idle_conns_length(), 0);
-          let c3 = pool.aquire().unwrap();
+          let c3 = pool.acquire().unwrap();
           pool.release(c1);
-          assert_eq!(pool.idle_conns_length(), 0);
-          pool.release(c2);
           assert_eq!(pool.idle_conns_length(), 1);
+          pool.release(c2);
+          assert_eq!(pool.idle_conns_length(), 2);
           pool.release(c3);
           assert_eq!(pool.idle_conns_length(), 2);
-          sleep(Duration::milliseconds(1000));
+           
           pool.release_all();
           assert_eq!(pool.idle_conns_length(), 0);
           tx.send(0);
        }
        
-       info!("test_aquire_relese ended---------");
+       info!("test_acquire_release ended---------");
     }
 
     #[test]
-    fn test_aquire_relese_multithread() {
+    fn test_acquire_release_multithread() {
       log::set_logger(box super::CustLogger { handle: stderr() } );
-        info!("test_aquire_relese_multithread started---------");
+        info!("test_acquire_release_multithread started---------");
         let mut cfg : config::Config = Default::default();
         cfg.port= Some(test::next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
@@ -405,28 +428,29 @@ pub mod test {
           for _ in range(0u, 10) {
               let p1 = pool_shared.clone();
               spawn(move || {
-                let c1 = p1.aquire().unwrap();
-                let c2 = p1.aquire().unwrap();
-                let c3 = p1.aquire().unwrap();
+                let c1 = p1.acquire().unwrap();
+                let c2 = p1.acquire().unwrap();
+                let c3 = p1.acquire().unwrap();
                 p1.release(c1);
                 p1.release(c2);
                 p1.release(c3);
               });  
           }
-          sleep(Duration::milliseconds(1000));
+           sleep(Duration::milliseconds(1000));
+         assert_eq!(pool_shared.idle_conns_length(), 10);
           pool_shared.release_all();
           assert_eq!(pool_shared.idle_conns_length(), 0);
           tx.send(0);
         }
        
       // assert_eq!(pool_shared.idle_conns_length(), 10);
-       info!("test_aquire_relese_multithread ended---------");
+       info!("test_acquire_release_multithread ended---------");
     }
 
     #[test]
-    fn test_aquire_relese_multithread_2() {
-      log::set_logger(box super::CustLogger { handle: stderr() } );
-        info!("test_aquire_relese_multithread_2 started---------");
+    fn test_acquire_release_multithread_2() {
+        log::set_logger(box super::CustLogger { handle: stderr() } );
+        info!("test_acquire_release_multithread_2 started---------");
         let mut cfg : config::Config = Default::default();
         cfg.port= Some(test::next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
@@ -436,25 +460,27 @@ pub mod test {
           listen_ip4_localhost(listen_port, rx);
         });
         
-        let  pool = super::ConnectionPool::new(2, 2, true, &cfg);
+        let  pool = super::ConnectionPool::new(2, 3, true, &cfg);
         assert_eq!(pool.init(), true);
         let pool_shared = Arc::new(pool);
         for _ in range(0u, 2) {
             let p1 =  pool_shared.clone();
-            spawn(move || {          
-                let c1 = p1.aquire().unwrap();
+            spawn(move || {  
+                info!("test_acquire_release_multithread_2 acquired connection in thread");        
+                let c1 = p1.acquire().unwrap();
+                 info!("test_acquire_release_multithread_2 release connection in thread"); 
                 p1.release(c1);
 
             });
        }
        sleep(Duration::milliseconds(1000));
+        info!("test_acquire_release_multithread_2 out of for loop :{}", pool_shared.idle_conns_length()); 
+       assert_eq!(pool_shared.idle_conns_length(), 2);
        pool_shared.release_all();
-     
        assert_eq!(pool_shared.idle_conns_length(), 0);
        tx.send(0);
-      // assert_eq!(pool.idle_conns_length(), 2);
-       
-      info!("test_aquire_relese_multithread_2 ended---------");
+     
+      info!("test_acquire_release_multithread_2 ended---------");
     }
 
     #[test]
@@ -469,7 +495,7 @@ pub mod test {
         cfg.use_ssl = Some(true);
         let  pool = super::ConnectionPool::new(2, 5, false, &cfg);
         assert_eq!(pool.init(), true);
-        sleep(Duration::milliseconds(500));
+       
         pool.release_all();
         assert_eq!(pool.idle_conns_length(), 0);
          info!("test_init_ssl ended---------");
