@@ -8,5 +8,5 @@ dependencies = [
 [[package]]
 name = "net-utils"
 version = "0.0.1"
-source = "git+https://github.com/rohitjoshi/net-utils.git#1cc0919b700199ddee00fd17adda7ef06fea891b"
+source = "git+https://github.com/rohitjoshi/net-utils.git#03eddf5d4f7242639869cd4a907b7994623f0d1e"
 

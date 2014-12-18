@@ -19,17 +19,21 @@ pub mod test {
     use std::io;
     use std::io::{TcpListener, Listener,Acceptor,TcpStream, stderr};
     use log;
+    use std::comm;
 #[test]
 fn test_lib() {
-    //log::set_logger(box poolmgr::CustLogger { handle: stderr() } );
+    log::set_logger(box poolmgr::CustLogger { handle: stderr() } );
     info!("test_lib started---------");
     let mut cfg : config::Config = Default::default();
     cfg.port= Some(io::test::next_test_port());
     cfg.server = Some("127.0.0.1".to_string());
+    
     let listen_port = cfg.port.unwrap();
+   
+    let (tx, rx): (Sender<int>, Receiver<int>) = channel();
         spawn(move || {
-          test::listen_ip4_localhost(listen_port);
-    });
+          test::listen_ip4_localhost(listen_port, rx);
+        });
    // cfg.use_ssl = Some(true);
     let mut pool = poolmgr::ConnectionPool::new(2, 20, true, &cfg);
    //get the connection
@@ -42,13 +46,14 @@ fn test_lib() {
     pool.release(conn);
     pool.release_all();
     assert_eq!(pool.idle_conns_length(), 0);
+    tx.send(0);
     info!("test_lib ended---------");
 
 }
 #[test]
 #[cfg(feature = "ssl")]
 fn test_lib_ssl() {
-    //log::set_logger(box poolmgr::CustLogger { handle: stderr() } );
+    log::set_logger(box poolmgr::CustLogger { handle: stderr() } );
     info!("test_lib_ssl started---------");
     let mut cfg : config::Config = Default::default();
     //set port to 80
