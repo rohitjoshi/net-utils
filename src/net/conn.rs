@@ -1,7 +1,6 @@
 //! Client Connection.  It supports unsecured and secured(SSL) connection
 #![experimental]
-use std::io::{BufferedReader, BufferedWriter, IoResult, InvalidInput, IoError, IoErrorKind, TcpStream};
-use std::sync::{ Arc, Mutex };
+use std::io::{BufferedReader, BufferedWriter, IoResult,  IoError, IoErrorKind, TcpStream};
 use std::os::unix::prelude::AsRawFd;
 
 #[cfg(feature = "ssl")] use openssl::ssl::{SslContext, SslMethod, SslStream, SslVerifyMode};
@@ -15,13 +14,17 @@ use net::config;
 /// A Connection object.  Make sure you syncronize if uses in multiple threads
 #[experimental]
 pub struct Connection  {
+    /// BufferedReader for NetStream (TCP/SSL)
     pub reader: BufferedReader<NetStream>,
+    /// BufferedWriter for NetStream (TCP/SSL)
     pub writer: BufferedWriter<NetStream>,
-    pub config: config::Config,
+    /// Config for connection
+    config: config::Config,
 }
 
+/// Implementation for Connectio
 impl  Connection {
-     
+     /// new function to create default Connection object
      fn new (reader: BufferedReader<NetStream>, writer: BufferedWriter<NetStream>, config: &config::Config) -> Connection {
         Connection {
             reader: reader,
@@ -211,20 +214,21 @@ impl Writer for NetStream {
 }
 
 
-//#[cfg(test)]
+#[cfg(test)]
+#[allow(unused_must_use)]
 impl Drop for Connection {
     ///drop method 
     fn drop(&mut self) {
         info!("Drop for Connection:Dropping connection!");
         match self.reader.get_mut() {
              &NetStream::UnsecuredTcpStream(ref mut stream) => {
-                 let mut rr = stream.close_read();
-                 let mut wr = stream.close_write();
+                  stream.close_read();
+                 stream.close_write();
             },  
              #[cfg(feature = "ssl")]
             &NetStream::SslTcpStream (ref mut ssl) =>  {           
-              let rr = ssl.get_mut().close_read();
-              let wr = ssl.get_mut().close_write();
+               ssl.get_mut().close_read();
+              ssl.get_mut().close_write();
             },       
         }
     }

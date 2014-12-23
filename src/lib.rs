@@ -7,8 +7,6 @@
 #[cfg(feature = "ssl")] extern crate openssl;
 #[phase(plugin, link)]extern crate log;
 #[phase(plugin, link)]extern crate time;
+/// module net provides the TCP/SSL connection and connection pool functionality
 pub mod net;
-
-
-
 

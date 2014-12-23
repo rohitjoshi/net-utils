@@ -11,6 +11,13 @@ ssl = ["openssl"]
 optional = true
 git = "https://github.com/sfackler/rust-openssl.git"
 
+[dependencies.time]
+git = "https://github.com/rust-lang/time.git"
+
+[dependencies]
+log = "0.1.0"
+#git = "https://github.com/rust-lang/log.git"
+
 
 
 
