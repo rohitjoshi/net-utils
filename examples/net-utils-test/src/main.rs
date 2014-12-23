@@ -1,8 +1,7 @@
 extern crate "net-utils" as utils;
 use std::default::Default;
-use std::sync::{ Arc, Mutex };
+use std::sync::{ Arc };
 use std::thread::Thread;
-
 
 use utils::net::config;
 use utils::net::poolmgr;
@@ -15,17 +14,20 @@ fn main() {
     //set host to
     cfg.server = Some("google.com".to_string());
    // cfg.use_ssl = Some(true);
-    let pool = poolmgr::ConnectionPool::new(2, 20, true, &cfg);
-    let pool = Arc::new(Mutex::new(pool));
+    let  pool = poolmgr::ConnectionPool::new(2, 5, true, &cfg);
+    let pool_shared = Arc::new(pool);
     for _ in range(0u, 2) {
-        let pool = pool.clone();
-        Thread::spawn(move || {
-            let mut conn = pool.lock().aquire().unwrap();
-            conn.writer.write_str("GET google.com\r\n").unwrap();
-            conn.writer.flush().unwrap();
-            let r = conn.reader.read_line();
-             println!("Received {}", r);
-            pool.lock().release(conn);
-       }).join();
+            let pool = pool_shared.clone();
+            let r = Thread::spawn(move || {
+                let mut conn = pool.acquire().unwrap();
+                println!("Sending request: GET google.com\r\n");
+                conn.writer.write_str("GET google.com\r\n").unwrap();
+                conn.writer.flush().unwrap();
+                let r = conn.reader.read_line();
+                println!("Received {}", r);
+                pool.release(conn);
+           }).join();
+
     }
+   
 }
