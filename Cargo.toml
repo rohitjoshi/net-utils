@@ -15,7 +15,7 @@ git = "https://github.com/sfackler/rust-openssl.git"
 git = "https://github.com/rust-lang/time.git"
 
 [dependencies]
-log = "0.1.0"
+log = "0.1.3"
 #git = "https://github.com/rust-lang/log.git"
 
 
