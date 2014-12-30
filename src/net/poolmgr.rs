@@ -46,6 +46,7 @@ pub struct ConnectionPool {
     config: config::Config,
     conns_inuse: AtomicUint, 
 }
+
 /// Default implementation for  ConnectionPool
 impl  Default for ConnectionPool {
     fn default() -> ConnectionPool {
