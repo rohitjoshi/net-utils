@@ -2,7 +2,7 @@
 
 use std::collections::RingBuf;
 use std::io::{IoResult,  IoError, IoErrorKind, LineBufferedWriter, stdio, stderr} ;
-use std::sync::{ Mutex};
+use std::sync::{mpsc, Mutex};
 use std::sync::atomic::{AtomicUint, Ordering};
 use std::default::Default;
 use log::{Logger,LogRecord, set_logger};
@@ -79,21 +79,21 @@ impl  ConnectionPool {
     }
     #[cfg(test)]
     pub fn idle_conns_count(& self) -> uint {
-       //  let mut idleconn = self.idle_conns.lock().lock();
+       //  let mut idleconn = self.idle_conns.lock().unwrap().lock().unwrap();
        //  let mut idleconn = self.idle_conns;
-         self.idle_conns.lock().len()
+         self.idle_conns.lock().unwrap().len()
 
     }
     /// Initial the connection pool
     pub fn init(& self) -> bool {
-       //  let mut idleconn = self.idle_conns.lock().lock();
+        // let mut idleconn = self.idle_conns.lock().unwrap();
         //  let  idleconn = self.idle_conns;
-         self.idle_conns.lock().reserve(self.max_conns);
+         self.idle_conns.lock().unwrap().reserve(self.max_conns);
          for i in range(0u, self.min_conns) {
             info!("Init:Creating connection {}", i);
             let  conn =   conn::Connection::connect(&self.config);
             match conn {
-                Ok(c) =>  self.idle_conns.lock().push_back(c) ,
+                Ok(c) =>  self.idle_conns.lock().unwrap().push_back(c) ,
                 Err(e) => { 
                     error!("Failed to create a connection: {}", e); 
                     return false; 
@@ -106,9 +106,9 @@ impl  ConnectionPool {
     pub fn release_all(& self) {
       info!("release_all called");
       info!("It should trigger drop connection");
-      self.idle_conns.lock().clear();
+      self.idle_conns.lock().unwrap().clear();
       self.conns_inuse.store(0, Ordering::Relaxed);
-      let total_count = self.idle_conns.lock().len() + self.conns_inuse.load(Ordering::Relaxed);
+      let total_count = self.idle_conns.lock().unwrap().len() + self.conns_inuse.load(Ordering::Relaxed);
       info!("release_all called: Total_count: {}", total_count);
     }
 
@@ -117,11 +117,11 @@ impl  ConnectionPool {
     #[allow(dead_code)]
     pub fn release(& self, conn: conn::Connection ) {
  
-        let total_count = self.idle_conns.lock().len();
+        let total_count = self.idle_conns.lock().unwrap().len();
         info!("release(): idle connection: {}", total_count);
         if total_count < self.max_conns && conn.is_valid()  {
             info!("Pushing back to ideal_conns");
-            self.idle_conns.lock().push_back(conn);
+            self.idle_conns.lock().unwrap().push_back(conn);
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
         }else if  !conn.is_valid() {
          //    let c = conn;
@@ -136,7 +136,7 @@ impl  ConnectionPool {
            info!("It should trigger drop connection");
         }
        
-        info!("release() end: Total_count: {}", self.idle_conns.lock().len() + self.conns_inuse.load(Ordering::Relaxed));
+        info!("release() end: Total_count: {}", self.idle_conns.lock().unwrap().len() + self.conns_inuse.load(Ordering::Relaxed));
       
     }
 
@@ -144,17 +144,17 @@ impl  ConnectionPool {
     #[allow(unused_variables)]
     pub fn drop(& self, conn: conn::Connection ) {
         self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
-        warn!("drop() end: Total_count: {}", self.idle_conns.lock().len() + self.conns_inuse.load(Ordering::Relaxed));
+        warn!("drop() end: Total_count: {}", self.idle_conns.lock().unwrap().len() + self.conns_inuse.load(Ordering::Relaxed));
         
     }
 
 
     /// Aquire Connection
     pub fn acquire(& self) -> IoResult<conn::Connection> {
-       // let mut idleconn = self.idle_conns.lock().lock();
+       // let mut idleconn = self.idle_conns.lock().unwrap().lock().unwrap();
         // let  idleconn = self.idle_conns;
 
-         let mut conns = self.idle_conns.lock();
+         let mut conns = self.idle_conns.lock().unwrap();
          {
             if !conns.is_empty()  {
               let result = conns.pop_front();
@@ -197,13 +197,13 @@ impl  ConnectionPool {
 pub mod test {
     use std::io::{TcpListener, Listener,Acceptor,TcpStream, stderr};
     use std::default::Default;
-    use std::sync::{ Arc,  };
+    use std::sync::{ Arc,mpsc  };
+    use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
     use std::thread::Thread;
     use net::config;
     use std::io;
     use std::io::test;
     use log;
-    use std::comm;
     use std::io::timer::sleep;
     use std::time::duration::Duration;
     #[cfg(test)]
@@ -225,11 +225,15 @@ pub mod test {
               }
             }
             match rx.try_recv() {
-                Ok(_) | Err(comm::Disconnected) => {
+                Ok(_)  => {
                     info!("******Terminating thread with port {}." , port);
                     break;
                 }
-                Err(comm::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    info!("******Terminating thread with port {}." , port);
+                    break;
+                }
+                Err(TryRecvError::Empty) => {}
             }
         }
         drop(acceptor);
