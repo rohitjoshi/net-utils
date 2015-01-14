@@ -5,8 +5,7 @@ use std::default::Default;
 
 
 ///Configuration data.
-#[deriving( Clone)]
-#[unstable]
+#[derive(Clone)]
 pub struct Config {
 	/// The server to connect to.
 	pub server: Option<String>,
@@ -25,7 +24,7 @@ pub struct Config {
 	/// Verify certificate
 	pub verify: Option<bool>,
 	/// Verify depth
-	pub verify_depth: Option<uint>
+	pub verify_depth: Option<u32>
 }
 
 impl Default for Config {

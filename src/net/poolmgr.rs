@@ -3,6 +3,7 @@
 use std::collections::RingBuf;
 use std::io::{IoResult,  IoError, IoErrorKind, LineBufferedWriter, stdio, stderr} ;
 use std::sync::{mpsc, Mutex};
+use std::rc::Rc;
 use std::sync::atomic::{AtomicUint, Ordering};
 use std::default::Default;
 use log::{Logger,LogRecord, set_logger};
@@ -40,8 +41,8 @@ impl Logger  for CustLogger {
 /// It has support for max number of connections with temporary allowable connections
 pub struct ConnectionPool {
     idle_conns:  Mutex<RingBuf<conn::Connection>>,
-    min_conns: uint,
-    max_conns: uint,
+    min_conns: usize,
+    max_conns: usize,
     tmp_conn_allowed: bool,
     config: config::Config,
     conns_inuse: AtomicUint, 
@@ -50,7 +51,7 @@ pub struct ConnectionPool {
 /// Default implementation for  ConnectionPool
 impl  Default for ConnectionPool {
     fn default() -> ConnectionPool {
-      log::set_logger(box CustLogger { handle: stderr() } );
+      log::set_logger(Box::new( CustLogger { handle: stderr() }) );
         ConnectionPool { 
             idle_conns: Mutex::new(RingBuf::new()),
          //   idle_conns: RingBuf::new(),
@@ -58,7 +59,7 @@ impl  Default for ConnectionPool {
             max_conns: 10, 
             tmp_conn_allowed: true,
             config: Default::default(),
-            conns_inuse: AtomicUint::new(0u),
+            conns_inuse: AtomicUint::new(0),
         }
     }
 }
@@ -66,19 +67,19 @@ impl  Default for ConnectionPool {
 /// Connection pool implementation
 impl  ConnectionPool {
     /// New instance
-    pub fn new(pool_min_size: uint, pool_max_size: uint, tmp_allowed: bool, conn_config: &config::Config) -> ConnectionPool {
-        log::set_logger(box CustLogger { handle: stderr() } );
+    pub fn new(pool_min_size: usize, pool_max_size: usize, tmp_allowed: bool, conn_config: &config::Config) -> ConnectionPool {
+        log::set_logger(Box::new( CustLogger { handle: stderr() } ));
         ConnectionPool { 
             idle_conns: Mutex::new(RingBuf::new()),
             min_conns: pool_min_size,
             max_conns: pool_max_size, 
             tmp_conn_allowed: tmp_allowed,
             config: conn_config.clone(),
-            conns_inuse: AtomicUint::new(0u),
+            conns_inuse: AtomicUint::new(0),
         }
     }
     #[cfg(test)]
-    pub fn idle_conns_count(& self) -> uint {
+    pub fn idle_conns_count(& self) ->  usize {
        //  let mut idleconn = self.idle_conns.lock().unwrap().lock().unwrap();
        //  let mut idleconn = self.idle_conns;
          self.idle_conns.lock().unwrap().len()
@@ -89,7 +90,7 @@ impl  ConnectionPool {
         // let mut idleconn = self.idle_conns.lock().unwrap();
         //  let  idleconn = self.idle_conns;
          self.idle_conns.lock().unwrap().reserve(self.max_conns);
-         for i in range(0u, self.min_conns) {
+         for i in range(0, self.min_conns) {
             info!("Init:Creating connection {}", i);
             let  conn =   conn::Connection::connect(&self.config);
             match conn {
@@ -201,6 +202,7 @@ pub mod test {
     use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
     use std::thread::Thread;
     use net::config;
+    use std::str;
     use std::io;
     use std::io::test;
     use log;
@@ -208,11 +210,11 @@ pub mod test {
     use std::time::duration::Duration;
     #[cfg(test)]
     #[allow(unused_variables)]
-    pub fn listen_ip4_localhost(port: u16, rx:Receiver<int>)  {
+    pub fn listen_ip4_localhost(port: u16, rx:Receiver<isize>)  {
         let uri = format!("127.0.0.1:{}", port);
         let mut acceptor = TcpListener::bind(uri.as_slice()).listen().unwrap();
        // let mut acceptor = listener.listen();
-       acceptor.set_timeout(Some(250));
+       acceptor.set_timeout(Some(1000));
         for  stream in acceptor.incoming() {
          
            match stream {
@@ -220,8 +222,9 @@ pub mod test {
               Ok(stream) => {
                  info!("Got new connection on port {}", port);
                   Thread::spawn(move || {
-                    info!("{}", handle_client(stream));
-                  }).detach();
+                    handle_client(stream);
+                    //info!("{}", handle_client(stream).unwrap());
+                  });
               }
             }
             match rx.try_recv() {
@@ -251,7 +254,7 @@ pub mod test {
                    stream.flush().unwrap();
                    break;
                 }else {
-                    warn!("handle_client: Received: {}. Sending it back", buf);
+                    warn!("handle_client: Received: {}. Sending it back", str::from_utf8(&buf).unwrap());
                     let result = stream.write(buf.slice(0, got));
                    
                   break;
@@ -264,7 +267,7 @@ pub mod test {
     #[test]
     fn test_new() {
       info!("test_new started---------");
-      log::set_logger(box super::CustLogger { handle: stderr() } );
+      log::set_logger(Box::new( super::CustLogger { handle: stderr() }) );
         let  cfg : config::Config = Default::default();
         let  pool = super::ConnectionPool::new(0, 5, false, &cfg);
         assert_eq!(pool.idle_conns_count(), 0);
@@ -277,7 +280,7 @@ pub mod test {
     ///test google
      #[test]
     fn test_google() {
-        log::set_logger(box super::CustLogger { handle: stderr() } );
+        log::set_logger(Box::new( super::CustLogger { handle: stderr() } ));
         info!("test_lib started---------");
         let mut cfg : config::Config = Default::default();
         cfg.port= Some(80); //Some(io::test::next_test_port());
@@ -292,7 +295,7 @@ pub mod test {
         conn.writer.write_str("GET google.com\r\n").unwrap();
         conn.writer.flush().unwrap();
         let r = conn.reader.read_line();
-        println!("Received {}", r);
+        println!("Received {}", r.unwrap());
         pool.release(conn);
         assert_eq!(pool.idle_conns_count(), 2);
         info!("test_lib ended---------");
@@ -301,7 +304,7 @@ pub mod test {
 
     #[test]
     fn test_init() {
-        log::set_logger(box super::CustLogger { handle: stderr() } );
+        log::set_logger(Box::new( super::CustLogger { handle: stderr() } ));
         info!("test_init started---------");
         
         let mut cfg : config::Config = Default::default();
@@ -313,12 +316,12 @@ pub mod test {
 
         {
             info!("test_init starting channel---------");
-           let (tx, rx): (Sender<int>, Receiver<int>) = channel();
+           let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
            info!("test_init spawning thread---------");
            Thread::spawn(move || {
               info!("test_init calling listen_Ip4_localhost with port {}", listen_port);
               listen_ip4_localhost(listen_port, rx);
-          }).detach();
+          });
           sleep(Duration::milliseconds(500));
           info!("test_init starting connection pool");
           let  pool = super::ConnectionPool::new(1, 5, false, &cfg);
@@ -332,7 +335,7 @@ pub mod test {
           c1.writer.flush().unwrap();       
           info!("reading line");
           let r = c1.reader.read_line();
-          info!("reading received: {}", r);
+          info!("reading received: {}", r.unwrap());
            info!("sending 0 to channel");
           tx.send(0);
           info!("releasing all");
@@ -347,29 +350,29 @@ pub mod test {
 
     #[test]
     fn test_example() {
-      log::set_logger(box super::CustLogger { handle: stderr() } );
+      log::set_logger(Box::new( super::CustLogger { handle: stderr() } ));
       info!("test_example started---------");
         let mut cfg : config::Config = Default::default();
         cfg.port= Some(test::next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
-        let (tx, rx): (Sender<int>, Receiver<int>) = channel();
+        let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
         Thread::spawn(move || {
           listen_ip4_localhost(listen_port, rx);
-        }).detach();
+        });
         let  pool = super::ConnectionPool::new(2, 5, true, &cfg);
         let pool_shared = Arc::new(pool);
-        for _ in range(0u, 6) {
+        for _ in range(0u32, 6) {
             let pool = pool_shared.clone();
             Thread::spawn(move || {
                 let mut conn = pool.acquire().unwrap();
 
-                conn.writer.write_str("GET google.com\r\n").unwrap();
-                conn.writer.flush().unwrap();
+                conn.writer.write_str("GET google.com\r\n");
+                conn.writer.flush();
                 let r = conn.reader.read_line();
-                println!("Received {}", r);
+                println!("Received {}", r.unwrap());
                 pool.release(conn);
-           }).detach();
+           });
         }
          sleep(Duration::milliseconds(1000));
          assert_eq!(pool_shared.idle_conns_count(), 5);
@@ -381,17 +384,17 @@ pub mod test {
 
     #[test]
     fn test_acquire_release_1() {
-      log::set_logger(box super::CustLogger { handle: stderr() } );
+      log::set_logger(Box::new( super::CustLogger { handle: stderr() } ));
         info!("test_acquire_release started---------");
         let mut cfg : config::Config = Default::default();
 
         cfg.port= Some(test::next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
-        let (tx, rx): (Sender<int>, Receiver<int>) = channel();
+        let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
         Thread::spawn(move || {
           listen_ip4_localhost(listen_port, rx);
-        }).detach();
+        });
         {
           let  pool = super::ConnectionPool::new(2, 2, true, &cfg);
           assert_eq!(pool.init(), true);
@@ -419,21 +422,21 @@ pub mod test {
 
     #[test]
     fn test_acquire_release_multithread() {
-      log::set_logger(box super::CustLogger { handle: stderr() } );
+      log::set_logger(Box::new( super::CustLogger { handle: stderr() } ));
         info!("test_acquire_release_multithread started---------");
         let mut cfg : config::Config = Default::default();
         cfg.port= Some(test::next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
-        let (tx, rx): (Sender<int>, Receiver<int>) = channel();
+        let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
         {
           Thread::spawn(move || {
             listen_ip4_localhost(listen_port, rx);
-          }).detach();
+          });
           let  pool = super::ConnectionPool::new(2, 10, true, &cfg);
           assert_eq!(pool.init(), true);
           let pool_shared = Arc::new(pool);
-          for _ in range(0u, 10) {
+          for _ in range(0u32, 10) {
               let p1 = pool_shared.clone();
               Thread::spawn(move || {
                 let c1 = p1.acquire().unwrap();
@@ -442,7 +445,7 @@ pub mod test {
                 p1.release(c1);
                 p1.release(c2);
                 p1.release(c3);
-              }).detach();  
+              });  
           }
           sleep(Duration::milliseconds(1000));
           assert_eq!(pool_shared.idle_conns_count(), 10);
@@ -457,21 +460,21 @@ pub mod test {
 
     #[test]
     fn test_acquire_release_multithread_2() {
-        log::set_logger(box super::CustLogger { handle: stderr() } );
+        log::set_logger(Box::new( super::CustLogger { handle: stderr() } ));
         info!("test_acquire_release_multithread_2 started---------");
         let mut cfg : config::Config = Default::default();
         cfg.port= Some(test::next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
-        let (tx, rx): (Sender<int>, Receiver<int>) = channel();
+        let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
         Thread::spawn(move || {
           listen_ip4_localhost(listen_port, rx);
-        }).detach();
+        });
         
         let  pool = super::ConnectionPool::new(2, 3, true, &cfg);
         assert_eq!(pool.init(), true);
         let pool_shared = Arc::new(pool);
-        for _ in range(0u, 2) {
+        for _ in range(0u32, 2) {
             let p1 =  pool_shared.clone();
             Thread::spawn(move || {  
                 info!("test_acquire_release_multithread_2 acquired connection in thread");        
@@ -479,7 +482,7 @@ pub mod test {
                  info!("test_acquire_release_multithread_2 release connection in thread"); 
                 p1.release(c1);
 
-            }).detach();
+            });
        }
        sleep(Duration::milliseconds(1000));
         info!("test_acquire_release_multithread_2 out of for loop :{}", pool_shared.idle_conns_count()); 
@@ -494,7 +497,7 @@ pub mod test {
     #[test]
     #[cfg(feature = "ssl")]
     fn test_init_ssl() {
-      log::set_logger(box super::CustLogger { handle: stderr() } );
+      log::set_logger(Box::new( super::CustLogger { handle: stderr() }) );
           info!("test_init_ssl started---------");
         let mut cfg : config::Config = Default::default();
         cfg.port= Some(443);

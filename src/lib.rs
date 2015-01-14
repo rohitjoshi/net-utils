@@ -1,9 +1,8 @@
 //! A simple, connection pool library.
 #![crate_name = "net-utils"]
 #![crate_type = "lib"]
-#![unstable]
 #![warn(missing_docs)]
-#![feature(slicing_syntax,phase)]
+#![feature(slicing_syntax)]
 #[cfg(feature = "ssl")] extern crate openssl;
 #[macro_use]extern crate log;
 #[macro_use]extern crate time;
