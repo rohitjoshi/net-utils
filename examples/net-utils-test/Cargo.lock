@@ -21,7 +21,7 @@ dependencies = [
 [[package]]
 name = "net-utils"
 version = "0.0.1"
-source = "git+https://github.com/rohitjoshi/net-utils.git#beb4db4002d522f13d6ab2847b36bab1d22c61bf"
+source = "git+https://github.com/rohitjoshi/net-utils.git#c51fafab45747db85c146af32c4b0c5797234a4c"
 dependencies = [
  "log 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",

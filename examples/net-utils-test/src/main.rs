@@ -2,7 +2,8 @@ extern crate "net-utils" as utils;
 use std::default::Default;
 use std::sync::{ Arc };
 use std::thread::Thread;
-
+use std::io::timer::sleep;
+use std::time::duration::Duration;
 use utils::net::config;
 use utils::net::poolmgr;
 
@@ -24,10 +25,12 @@ fn main() {
                 conn.writer.write_str("GET google.com\r\n").unwrap();
                 conn.writer.flush().unwrap();
                 let r = conn.reader.read_line();
-                println!("Received {}", r);
+                println!("Received {}", r.unwrap());
                 pool.release(conn);
-           }).join();
+           });
 
     }
+    sleep(Duration::milliseconds(1000));
+
    
 }
