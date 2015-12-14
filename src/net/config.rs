@@ -1,7 +1,7 @@
 //!Configuration for connection object
-#![unstable]
+//#![unstable]
 use std::default::Default;
-
+use std::path::{ PathBuf};
 
 
 ///Configuration data.
@@ -16,11 +16,11 @@ pub struct Config {
 	///If true, it will assume ssl is enabled
 	pub use_ssl: Option<bool>,
 	/// Certificate File
-	pub certificate_file: Option<Path>,
+	pub certificate_file: Option<PathBuf>,
 	/// Private Key File
-	pub private_key_file: Option<Path>,
+	pub private_key_file: Option<PathBuf>,
 	/// CA File
-	pub ca_file: Option<Path>,
+	pub ca_file: Option<PathBuf>,
 	/// Verify certificate
 	pub verify: Option<bool>,
 	/// Verify depth
@@ -47,13 +47,12 @@ impl Default for Config {
 pub mod test {
 	use std::default::Default;
     #[test]
-    fn test_config() {    
+    fn test_config() {
         let c = super::Config {
-            server: Some("localhost".to_string()), 
+            server: Some("localhost".to_string()),
             port: Some(2195),
-             ..Default::default()};   
-          assert_eq!(c.port, Some(2195)); 
-          assert_eq!(c.connect_timeout, Some(30_000)); 
+             ..Default::default()};
+          assert_eq!(c.port, Some(2195));
+          assert_eq!(c.connect_timeout, Some(30_000));
     }
 }
-

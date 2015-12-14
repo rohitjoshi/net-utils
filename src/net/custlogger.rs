@@ -23,4 +23,4 @@ impl Logger  for CustLogger {
       }
     }
 
-/// usage: log::set_logger(Box::new( CustLogger { handle: stderr() }) );
+// usage: log::set_logger(Box::new( CustLogger { handle: stderr() }) );

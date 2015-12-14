@@ -1,31 +1,35 @@
 //! Client Connection.  It supports unsecured and secured(SSL) connection
 #[cfg(feature = "ssl")] use std::borrow::ToOwned;
 #[cfg(feature = "ssl")] use std::error::Error;
-use std::io::{BufferedReader, BufferedWriter, IoResult,  IoError, IoErrorKind, TcpStream};
+use std::io::{Write, Read, Result,  BufReader, BufWriter};
+use std::net::{TcpStream, Shutdown};
 use std::os::unix::prelude::AsRawFd;
-use std::rc::Rc;
+
 #[cfg(feature = "ssl")] use openssl::ssl::{SslContext, SslMethod, SslStream, SslVerifyMode};
 #[cfg(feature = "ssl")] use openssl::ssl::error::SslError;
 #[cfg(feature = "ssl")] use openssl::x509;
 //use std::bool;
 use net::config;
+
 //pub mod config;
 
 
 /// A Connection object.  Make sure you syncronize if uses in multiple threads
 pub struct Connection  {
-    /// BufferedReader for NetStream (TCP/SSL)
-    pub reader: BufferedReader<NetStream>,
-    /// BufferedWriter for NetStream (TCP/SSL)
-    pub writer: BufferedWriter<NetStream>,
+    /// BufReader for NetStream (TCP/SSL)
+    pub reader: BufReader<NetStream>,
+    /// BufWriter for NetStream (TCP/SSL)
+    pub writer: BufWriter<NetStream>,
     /// Config for connection
     config:  config::Config,
+
+
 }
 
 /// Implementation for Connectio
 impl  Connection {
      /// new function to create default Connection object
-     fn new (reader: BufferedReader<NetStream>, writer: BufferedWriter<NetStream>, config: &config::Config) -> Connection {
+     fn new (reader: BufReader<NetStream>, writer: BufWriter<NetStream>, config: &config::Config) -> Connection {
         Connection {
             reader: reader,
             writer: writer,
@@ -33,8 +37,8 @@ impl  Connection {
         }
      }
     /// Creates a  TCP connection to the specified server.
-    #[experimental]
-    pub fn connect(config: &config::Config) -> IoResult<Connection> {
+
+    pub fn connect(config: &config::Config) -> Result<Connection> {
         if config.use_ssl.unwrap_or(false)  {
            Connection::connect_ssl_internal(config)
         }else {
@@ -43,8 +47,8 @@ impl  Connection {
     }
 
     /// Creates a  TCP/SSL connection to the specified server. If already connected, it will drop and reconnect
-    #[experimental]
-    pub fn reconnect(&mut self) ->  IoResult<Connection> {
+
+    pub fn reconnect(&mut self) ->  Result<Connection> {
         if self.config.use_ssl.unwrap_or(false)  {
             Connection::connect_ssl_internal(&self.config)
         }else {
@@ -78,14 +82,17 @@ impl  Connection {
 
 
     /// Creates a TCP connection with an optional timeout.
-    #[experimental]
-    fn connect_internal(config: &config::Config) -> IoResult<Connection> {
-        info!("Connecting to server {}:{}", config.server.clone().unwrap(), config.port.unwrap());
-        let mut socket = try!(TcpStream::connect((&config.server.clone().unwrap()[], config.port.unwrap())));
-        socket.set_timeout(config.connect_timeout);
+
+    fn connect_internal(config: &config::Config) -> Result<Connection> {
+        let host: &str = &config.server.clone().unwrap();
+        let port = config.port.unwrap();
+        error!("Connecting to server {}:{}", host, port);
+        let reader_socket = try!(TcpStream::connect((host, port)));
+        let writer_socket = try!(reader_socket.try_clone());
+      //fixme:  socket.set_timeout(config.connect_timeout);
         Ok(Connection::new(
-            BufferedReader::new(NetStream::UnsecuredTcpStream(socket.clone())),
-            BufferedWriter::new(NetStream::UnsecuredTcpStream(socket)),
+            BufReader::new(NetStream::UnsecuredTcpStream(reader_socket)),
+            BufWriter::new(NetStream::UnsecuredTcpStream(writer_socket)),
             config,
         ))
     }
@@ -93,16 +100,16 @@ impl  Connection {
 
 
     /// Panics because SSL support was not included at compilation.
-    #[experimental]
+
     #[cfg(not(feature = "ssl"))]
-    fn connect_ssl_internal(config: &config::Config) -> IoResult<Connection> {
+    fn connect_ssl_internal(config: &config::Config) -> Result<Connection> {
         panic!("Cannot connect to {}:{} over SSL without compiling with SSL support.", config.server.clone().unwrap(), config.port.unwrap())
     }
 
     /// Creates a  TCP connection over SSL.
-    #[experimental]
+
     #[cfg(feature = "ssl")]
-    fn connect_ssl_internal(config: &config::Config) -> IoResult<Connection> {
+    fn connect_ssl_internal(config: &config::Config) -> Result<Connection> {
           info!("Connecting to server {}:{}", config.server.clone().unwrap(), config.port.unwrap());
       //  let mut socket = try!(TcpStream::connect(format!("{}:{}", server, port)[]));
         let mut socket = try!(TcpStream::connect((&config.server.clone().unwrap()[], config.port.unwrap())));
@@ -115,17 +122,17 @@ impl  Connection {
 
         let ssl_socket = try!(ssl_to_io(SslStream::new(&ssl, socket)));
         Ok(Connection::new(
-                BufferedReader::new(NetStream::SslTcpStream(ssl_socket.clone())),
-                BufferedWriter::new(NetStream::SslTcpStream(ssl_socket)),
+                BufReader::new(NetStream::SslTcpStream(ssl_socket.clone())),
+                BufWriter::new(NetStream::SslTcpStream(ssl_socket)),
                 config,
         ))
 
     }
 
     /// Set the SSL certs and verification options
-     #[experimental]
+
     #[cfg(feature = "ssl")]
-    fn set_ssl_options(ssl: &mut SslContext, config: &config::Config) -> Result<(),IoError> {
+    fn set_ssl_options(ssl: &mut SslContext, config: &config::Config) -> Result<(),Error> {
          //verify peer
         if config.verify.unwrap_or(false) {
             ssl.set_verify(SslVerifyMode::SslVerifyPeer, None);
@@ -155,26 +162,26 @@ impl  Connection {
 }
 
 
-/// Converts a Result<T, SslError> isizeo an IoResult<T>.
+/// Converts a Result<T, SslError> isizeo an Result<T>.
 #[cfg(feature = "ssl")]
-fn ssl_to_io<T>(res: Result<T, SslError>) -> IoResult<T> {
+fn ssl_to_io<T>(res: Result<T, SslError>) -> Result<T> {
     match res {
         Ok(x) => Ok(x),
-        Err(e) => Err(IoError {
-            kind: IoErrorKind::OtherIoError,
+        Err(e) => Err(Error {
+            kind: ErrorKind::OtherError,
             desc: "An SSL error occurred.",
             detail: Some(e.description().to_owned()),
         }),
     }
 }
 
-/// Converts a Result<T, SslError> isizeo an IoResult<T>.
+/// Converts a Result<T, SslError> isizeo an Result<T>.
 #[cfg(feature = "ssl")]
-fn ssl_option_to_io(res: Option<SslError>) -> Result<(),IoError> {
+fn ssl_option_to_io(res: Option<SslError>) -> Result<(),Error> {
     match res {
         None => Ok(()),
-        Some(e) => Err(IoError {
-            kind: IoErrorKind::OtherIoError,
+        Some(e) => Err(Error {
+            kind: ErrorKind::OtherError,
             desc: "An SSL error occurred.",
             detail: Some(e.description().to_owned()),
         }),
@@ -183,18 +190,20 @@ fn ssl_option_to_io(res: Option<SslError>) -> Result<(),IoError> {
 
 
 /// An abstraction over different networked streams.
-#[experimental]
+
 pub enum NetStream {
     /// An unsecured TcpStream.
     UnsecuredTcpStream(TcpStream),
     /// An SSL-secured TcpStream.
     /// This is only available when compiled with SSL support.
     #[cfg(feature = "ssl")]
-    SslTcpStream(SslStream<TcpStream>),
+    SslTcpStream(SslStream<&TcpStream>),
 }
-
-impl Reader for NetStream {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+// trait Reader {
+//     fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
+// }
+impl Read for NetStream {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         match self {
             &mut NetStream::UnsecuredTcpStream(ref mut stream) => stream.read(buf),
             #[cfg(feature = "ssl")]
@@ -202,13 +211,30 @@ impl Reader for NetStream {
         }
     }
 }
-
-impl Writer for NetStream {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+// trait Writer {
+//     fn write(&mut self, buf: &[u8]) -> Result<()>;
+//     fn write_all(&mut self, buf: &[u8]) -> Result<()>;
+// }
+impl Write for NetStream {
+    fn write(&mut self, buf: &[u8]) -> Result<(usize)> {
         match self {
             &mut NetStream::UnsecuredTcpStream(ref mut stream) => stream.write(buf),
             #[cfg(feature = "ssl")]
             &mut NetStream::SslTcpStream(ref mut stream) => stream.write(buf),
+        }
+    }
+    fn write_all(&mut self, buf: &[u8]) -> Result<()> {
+        match self {
+            &mut NetStream::UnsecuredTcpStream(ref mut stream) => stream.write_all(buf),
+            #[cfg(feature = "ssl")]
+            &mut NetStream::SslTcpStream(ref mut stream) => stream.write_all(buf),
+        }
+    }
+    fn flush(&mut self) -> Result<()> {
+        match self {
+            &mut NetStream::UnsecuredTcpStream(ref mut stream) => stream.flush(),
+            #[cfg(feature = "ssl")]
+            &mut NetStream::SslTcpStream(ref mut stream) => stream.flush(),
         }
     }
 }
@@ -222,13 +248,13 @@ impl Drop for Connection {
         info!("Drop for Connection:Dropping connection!");
         match self.reader.get_mut() {
              &mut NetStream::UnsecuredTcpStream(ref mut stream) => {
-                  stream.close_read();
-                 stream.close_write();
+                  stream.shutdown(Shutdown::Read);
+                 stream.shutdown(Shutdown::Write);
             },
              #[cfg(feature = "ssl")]
             &mut NetStream::SslTcpStream (ref mut ssl) =>  {
-               ssl.get_mut().close_read();
-              ssl.get_mut().close_write();
+               ssl.get_mut().shutdown(Shutdown::Read);
+              ssl.get_mut().shutdown(Shutdown::Write);
             },
         }
     }
