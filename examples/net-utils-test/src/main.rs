@@ -1,11 +1,14 @@
-extern crate "net-utils" as utils;
+use std::io::prelude::*;
 use std::default::Default;
 use std::sync::{ Arc };
-use std::thread::Thread;
-use std::io::timer::sleep;
-use std::time::duration::Duration;
+use std::thread;
+use std::thread::sleep;
+//use std::io::timer::sleep;
+use std::time::Duration;
+extern crate net_utils as utils;
 use utils::net::config;
 use utils::net::poolmgr;
+
 
 
 fn main() {
@@ -17,20 +20,23 @@ fn main() {
    // cfg.use_ssl = Some(true);
     let  pool = poolmgr::ConnectionPool::new(2, 5, true, &cfg);
     let pool_shared = Arc::new(pool);
-    for _ in range(0u, 2) {
+    for _ in 0u32..2 {
             let pool = pool_shared.clone();
-            let r = Thread::spawn(move || {
+             thread::spawn(move || {
                 let mut conn = pool.acquire().unwrap();
                 println!("Sending request: GET google.com\r\n");
-                conn.writer.write_str("GET google.com\r\n").unwrap();
+                conn.writer.write("GET google.com\r\n".as_bytes()).unwrap();
                 conn.writer.flush().unwrap();
-                let r = conn.reader.read_line();
-                println!("Received {}", r.unwrap());
+                let mut buffer = String::new();
+                let r = conn.reader.read_line(&mut buffer);
+                if r.unwrap() > 0 {
+                  println!("Received {}", buffer);
+                }
                 pool.release(conn);
            });
 
     }
-    sleep(Duration::milliseconds(1000));
+    sleep(Duration::from_millis(1000));
 
-   
+
 }
