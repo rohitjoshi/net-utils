@@ -1,20 +1,20 @@
 //! Client Connection.  It supports unsecured and secured(SSL) connection
-//#[cfg(feature = "ssl")]
-//use std::borrow::ToOwned;
+#[cfg(feature = "ssl")]
+use std::borrow::ToOwned;
 #[cfg(feature = "ssl")]
 use std::error::Error as StdError;
 #[cfg(feature = "ssl")]
-use std::io::{ErrorKind, Error};
+use std::io::ErrorKind;
 #[cfg(feature = "ssl")]
 use std::result::Result as StdResult;
-use std::io::{Write, Read, Result, BufReader, BufWriter};
+use std::io::{Write, Read, Result, Error, BufReader, BufWriter};
 use std::net::TcpStream;
 #[cfg(test)]
 use std::net::Shutdown;
 use std::os::unix::prelude::AsRawFd;
 
 #[cfg(feature = "ssl")]
-use openssl::ssl::{SslContext, SslMethod, SslStream, SSL_VERIFY_PEER};
+use openssl::ssl::{SslContext, SslMethod, SslStream, SslVerifyMode};
 #[cfg(feature = "ssl")]
 use openssl::ssl::error::SslError;
 #[cfg(feature = "ssl")]
@@ -125,42 +125,51 @@ impl Connection {
         let port = config.port.unwrap();
         info!("Connecting to server {}:{}", host, port);
         // let mut socket = try!(TcpStream::connect(format!("{}:{}", server, port)[]));
-        let socket = try!(TcpStream::connect((host, port)));
+        let mut socket = try!(TcpStream::connect((host, port)));
         // socket.set_timeout(config.connect_timeout);
+
         let mut ssl = try!(ssl_to_io(SslContext::new(SslMethod::Tlsv1)));
 
-        // verify peer
-        if config.verify.unwrap_or(false) {
-            ssl.set_verify(SSL_VERIFY_PEER, None);
-        }
+        // set ssl options
+           try!(Connection::set_ssl_options(&mut ssl, config));
 
-        // verify depth
-        if config.verify_depth.unwrap_or(0) > 0 {
-            ssl.set_verify_depth(config.verify_depth.unwrap());
-        }
-        if config.certificate_file.is_some() {
-        try!(ssl_to_io(ssl.set_certificate_file(config.certificate_file.as_ref().unwrap(),
-                                           x509::X509FileType::PEM)));
-        }
-        if config.private_key_file.is_some() {
-            try!(ssl_to_io(ssl.set_private_key_file(config.private_key_file.as_ref().unwrap(),
-                                                           x509::X509FileType::PEM)));
-        }
-        if config.ca_file.is_some() {
-            try!(ssl_to_io(ssl.set_CA_file(config.ca_file.as_ref().unwrap())));
-        }
-
-
-        let ssl_socket = try!(ssl_to_io(SslStream::connect(&ssl, socket)));
-        let read_sock = try!(ssl_socket.try_clone());
-        Ok(Connection::new(BufReader::new(NetStream::SslTcpStream(read_sock)),
+        let ssl_socket = try!(ssl_to_io(SslStream::new(&ssl, socket)));
+        Ok(Connection::new(BufReader::new(NetStream::SslTcpStream(ssl_socket.clone())),
                            BufWriter::new(NetStream::SslTcpStream(ssl_socket)),
                            config))
 
     }
 }
 
+/// Set the SSL certs and verification options
+#[cfg(feature = "ssl")]
+fn set_ssl_options(ssl: &mut SslContext, config: &config::Config) -> Result<Error> {
+//verify peer
+if config.verify.unwrap_or(false) {
+try!(ssl.set_verify(SslVerifyMode::SslVerifyPeer, None));
+}
 
+//verify depth
+if config.verify_depth.unwrap_or(0) > 0 {
+try!(ssl.set_verify_depth(config.verify_depth.unwrap()));
+}
+
+if config.certificate_file.is_some() {
+try!(ssl_option_to_io(ssl.set_certificate_file(config.certificate_file.as_ref().unwrap(),
+     x509::X509FileType::PEM)));
+}
+//load private key if populated
+if config.private_key_file.is_some() {
+try!(ssl_option_to_io(ssl.set_private_key_file(config.private_key_file.as_ref().unwrap(),
+     x509::X509FileType::PEM)));
+}
+
+//load cafile if populated
+if config.ca_file.is_some() {
+try!(ssl_option_to_io(ssl.set_CA_file(config.ca_file.as_ref().unwrap())));
+}
+Ok(())
+}
 /// Converts a Result<T, SslError> isizeo an Result<T>.
 #[cfg(feature = "ssl")]
 fn ssl_to_io<T>(res: StdResult<T, SslError>) -> Result<T> {
@@ -171,6 +180,17 @@ fn ssl_to_io<T>(res: StdResult<T, SslError>) -> Result<T> {
                            &format!("An SSL error occurred. ({})", e.description())[..]))
         }
     }
+}
+// Converts a Result<T, SslError> isizeo an Result<T>.
+#[cfg(feature = "ssl")]
+fn ssl_option_to_io(res: StdResult<(),SslError>) -> Result<Error> {
+match res {
+Ok(()) => Ok(()),
+Err(e) => Err(Error::new(
+ErrorKind::Other,
+&format!("An SSL error occurred. ({})", e.description())[..]
+)),
+}
 }
 
 
