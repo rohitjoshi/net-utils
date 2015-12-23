@@ -1,6 +1,9 @@
 net-utils
 =========
 
+[![Build Status]https://travis-ci.org/rohitjoshi/net-utils.svg?branch=master)](https://travis-ci.org/rohitjoshi/net-utils)
+
+
 Provides networking utility including TCP/SSL connection and connection manager.
 
 Here is an example of using connection pool.
