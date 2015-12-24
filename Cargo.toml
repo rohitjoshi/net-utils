@@ -2,27 +2,27 @@
 name = "net-utils"
 version = "0.0.1"
 authors = ["Rohit Joshi <rohit.joshi@gmail.com>"]
-
+description = "Network utility library which provides client connection pool for TCP/SSL connctions"
+repository = "https://github.com/rohitjoshi/net-utils"
+readme = "README.md"
+keywords = ["connection-pool", "TCP", "SSL"]
+license = "Apache-2.0"
+license-file = "LICENSE-Apache"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
 
 [features]
 ssl = ["openssl"]
 
 [dependencies]
-#openssl = "*"
-time = "*"
-log  = "*"
-uuid = "*"
+time = "0.1.34"
+log  = "0.3.4"
+uuid = "0.1.18"
 
 [dev-dependencies]
 env_logger = "0.3"
 
 [dependencies.openssl]
 optional = true
-#git = "https://github.com/sfackler/rust-openssl.git"
-
-#[dependencies.time]
-#git = "https://github.com/rust-lang/time.git"
-
-#[dependencies]
-#log = "0.1.3"
-#git = "https://github.com/rust-lang/log.git"
