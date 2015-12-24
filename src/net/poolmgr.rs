@@ -428,10 +428,10 @@ pub mod tests {
 
     #[test]
     fn test_acquire_release_multithread() {
-
+        sleep(Duration::from_millis(2000));
         info!("test_acquire_release_multithread started---------");
         let mut cfg: config::Config = Default::default();
-        cfg.port = Some(next_test_port());
+        cfg.port = Some(next_test_port() + 10);
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
         let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
