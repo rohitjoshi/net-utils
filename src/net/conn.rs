@@ -21,12 +21,14 @@ use openssl::ssl::error::SslError;
 use openssl::x509;
 // use std::bool;
 use net::config;
+use uuid::Uuid;
 
 // pub mod config;
 
 
 /// A Connection object.  Make sure you syncronize if uses in multiple threads
 pub struct Connection {
+    id: String,
     /// BufReader for NetStream (TCP/SSL)
     pub reader: BufReader<NetStream>,
     /// BufWriter for NetStream (TCP/SSL)
@@ -43,11 +45,15 @@ impl Connection {
            config: &config::Config)
            -> Connection {
         Connection {
+            id: Uuid::new_v4().to_urn_string(),
             reader: reader,
             writer: writer,
-            config: config.clone(),
+            config: config.clone()
         }
     }
+
+    /// connection unique id
+    
     /// Creates a  TCP connection to the specified server.
 
     pub fn connect(config: &config::Config) -> Result<Connection> {
@@ -99,7 +105,7 @@ impl Connection {
     fn connect_internal(config: &config::Config) -> Result<Connection> {
         let host: &str = &config.server.clone().unwrap();
         let port = config.port.unwrap();
-        error!("Connecting to server {}:{}", host, port);
+        info!("Connecting to server {}:{}", host, port);
         let reader_socket = try!(TcpStream::connect((host, port)));
         let writer_socket = try!(reader_socket.try_clone());
         // fixme:  socket.set_timeout(config.connect_timeout);

@@ -63,11 +63,18 @@ impl ConnectionPool {
         self.idle_conns.lock().unwrap().reserve(self.max_conns);
         for i in 0..self.min_conns {
             info!("Init:Creating connection {}", i);
-            let conn = conn::Connection::connect(&self.config);
+            let  conn = conn::Connection::connect(&self.config);
+            let host: &str = &self.config.server.clone().unwrap();
+            let port = &self.config.port.unwrap();
             match conn {
-                Ok(c) => self.idle_conns.lock().unwrap().push_back(c),
+                Ok(c) => {
+                    self.idle_conns.lock().unwrap().push_back(c);
+                    error!("Connection id:, Connecting to server {}:{}", host, port);
+                },
                 Err(e) => {
-                    error!("Failed to create a connection: {}", e);
+                    info!("Connection id:, Connecting to server {}:{}", host, port);
+                    error!("Connection id: Failed to create a connection to {}:{}. Error: {}",
+                    host, port,e);
                     return false;
                 }
             }
@@ -244,7 +251,7 @@ pub mod tests {
         use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
         static NEXT_OFFSET: AtomicUsize = ATOMIC_USIZE_INIT;
         const BASE_PORT: u16 = 9600;
-        1 + BASE_PORT + NEXT_OFFSET.fetch_add(1, Ordering::Relaxed) as u16
+        BASE_PORT + NEXT_OFFSET.fetch_add(1, Ordering::Relaxed) as u16
     }
 
 
@@ -385,13 +392,14 @@ pub mod tests {
         info!("test_acquire_release started---------");
         let mut cfg: config::Config = Default::default();
 
-        cfg.port = Some(next_test_port());
+        cfg.port = Some(next_test_port() );
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
         let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
         thread::spawn(move || {
             listen_ip4_localhost(listen_port, rx);
         });
+        sleep(Duration::from_millis(1000));
         {
             let pool = super::ConnectionPool::new(2, 2, true, &cfg);
             assert_eq!(pool.init(), true);
@@ -430,6 +438,9 @@ pub mod tests {
             thread::spawn(move || {
                 listen_ip4_localhost(listen_port, rx);
             });
+
+            sleep(Duration::from_millis(1000));
+
             let pool = super::ConnectionPool::new(2, 10, true, &cfg);
             assert_eq!(pool.init(), true);
             let pool_shared = Arc::new(pool);
@@ -460,14 +471,14 @@ pub mod tests {
 
         info!("test_acquire_release_multithread_2 started---------");
         let mut cfg: config::Config = Default::default();
-        cfg.port = Some(next_test_port());
+        cfg.port = Some(next_test_port() );
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
         let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
         thread::spawn(move || {
             listen_ip4_localhost(listen_port, rx);
         });
-
+        sleep(Duration::from_millis(1000));
         let pool = super::ConnectionPool::new(2, 3, true, &cfg);
         assert_eq!(pool.init(), true);
         let pool_shared = Arc::new(pool);

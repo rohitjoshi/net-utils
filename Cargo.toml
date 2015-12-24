@@ -11,6 +11,7 @@ ssl = ["openssl"]
 #openssl = "*"
 time = "*"
 log  = "*"
+uuid = "*"
 
 [dev-dependencies]
 env_logger = "0.3"
