@@ -381,7 +381,7 @@ pub mod tests {
             });
         }
         sleep(Duration::from_millis(500));
-        assert_eq!(pool_shared.idle_conns_count(), 5);
+        assert_eq!(pool_shared.idle_conns_count(), 2);
         pool_shared.release_all();
         assert_eq!(pool_shared.idle_conns_count(), 0);
         tx.send(0);
@@ -461,7 +461,7 @@ pub mod tests {
                 });
             }
             sleep(Duration::from_millis(2000));
-            assert_eq!(pool_shared.idle_conns_count(), 10);
+            assert_eq!(pool_shared.idle_conns_count(), 2);
             pool_shared.release_all();
             assert_eq!(pool_shared.idle_conns_count(), 0);
             tx.send(0);
