@@ -62,17 +62,17 @@ impl ConnectionPool {
     pub fn init(&self) -> bool {
         self.idle_conns.lock().unwrap().reserve(self.max_conns);
         for i in 0..self.min_conns {
-            info!("Init:Creating connection {}", i);
+            info!("*****Init:Creating connection {}", i);
             let  conn = conn::Connection::connect(&self.config);
             let host: &str = &self.config.server.clone().unwrap();
             let port = &self.config.port.unwrap();
             match conn {
                 Ok(c) => {
                     self.idle_conns.lock().unwrap().push_back(c);
-                    error!("Connection id:, Connecting to server {}:{}", host, port);
+                    error!("Connection id:{}, Connecting to server {}:{}", i, host, port);
                 },
                 Err(e) => {
-                    info!("Connection id:, Connecting to server {}:{}", host, port);
+                    info!("Connection id:{}, Connecting to server {}:{}", i, host, port);
                     error!("Connection id: Failed to create a connection to {}:{}. Error: {}",
                     host, port,e);
                     return false;
@@ -98,9 +98,9 @@ impl ConnectionPool {
     ///Releae connection
     #[allow(dead_code)]
     pub fn release(&self, conn: conn::Connection) {
-        let total_count = self.idle_conns.lock().unwrap().len();
-        info!("release(): idle connection: {}", total_count);
-        if total_count < self.max_conns && conn.is_valid() {
+        let idle_count = self.idle_conns.lock().unwrap().len();
+        info!("release(): idle connection: {}", idle_count);
+        if idle_count < self.min_conns && conn.is_valid() {
             info!("Pushing back to ideal_conns");
             self.idle_conns.lock().unwrap().push_back(conn);
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
@@ -119,7 +119,7 @@ impl ConnectionPool {
 
     }
 
-    /// Drop connection.  Use only if discconect.
+    /// Drop connection.  Use only if disconect.
     #[allow(unused_variables)]
     pub fn drop(&self, conn: conn::Connection) {
         self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
@@ -143,7 +143,7 @@ impl ConnectionPool {
                     return Ok(conn);
                 }
             }
-            debug!("Allocating new connection");
+            info!("Allocating new connection");
             let total_count = conns.len() + self.conns_inuse.load(Ordering::Relaxed);
             if total_count >= self.max_conns && self.tmp_conn_allowed == false {
                 return Err(Error::new(ErrorKind::Other,
@@ -154,6 +154,7 @@ impl ConnectionPool {
 
             }
         }
+        info!("*****Init:Creating connection..");
         let conn = conn::Connection::connect(&self.config);
         match conn {
             Ok(c) => {
@@ -364,7 +365,7 @@ pub mod tests {
         sleep(Duration::from_millis(1000));
         let pool = super::ConnectionPool::new(2, 5, true, &cfg);
         let pool_shared = Arc::new(pool);
-        for _ in 0u32..5 {
+        for _ in 0u32..6 {
             let pool = pool_shared.clone();
             thread::spawn(move || {
                 let mut conn = pool.acquire().unwrap();
@@ -379,7 +380,7 @@ pub mod tests {
                 pool.release(conn);
             });
         }
-        sleep(Duration::from_millis(5000));
+        sleep(Duration::from_millis(500));
         assert_eq!(pool_shared.idle_conns_count(), 5);
         pool_shared.release_all();
         assert_eq!(pool_shared.idle_conns_count(), 0);
@@ -408,8 +409,10 @@ pub mod tests {
             assert_eq!(pool.idle_conns_count(), 2);
 
             let c1 = pool.acquire().unwrap();
+            info!("c1: {}", pool.idle_conns_count());
             assert_eq!(pool.idle_conns_count(), 1);
             let c2 = pool.acquire().unwrap();
+            info!("c2: {}", pool.idle_conns_count());
             assert_eq!(pool.idle_conns_count(), 0);
             let c3 = pool.acquire().unwrap();
             pool.release(c1);
@@ -429,7 +432,7 @@ pub mod tests {
 
     #[test]
     fn test_acquire_release_multithread() {
-        sleep(Duration::from_millis(2000));
+        //sleep(Duration::from_millis(2000));
         info!("test_acquire_release_multithread started---------");
         let mut cfg: config::Config = Default::default();
         cfg.port = Some(next_test_port() + 10);
@@ -441,7 +444,7 @@ pub mod tests {
                 listen_ip4_localhost(listen_port, rx);
             });
 
-            sleep(Duration::from_millis(2000));
+            sleep(Duration::from_millis(1000));
 
             let pool = super::ConnectionPool::new(2, 10, true, &cfg);
             assert_eq!(pool.init(), true);
@@ -457,7 +460,7 @@ pub mod tests {
                     p1.release(c3);
                 });
             }
-            sleep(Duration::from_millis(1000));
+            sleep(Duration::from_millis(2000));
             assert_eq!(pool_shared.idle_conns_count(), 10);
             pool_shared.release_all();
             assert_eq!(pool_shared.idle_conns_count(), 0);
@@ -480,7 +483,7 @@ pub mod tests {
         thread::spawn(move || {
             listen_ip4_localhost(listen_port, rx);
         });
-        sleep(Duration::from_millis(2000));
+        sleep(Duration::from_millis(1000));
         let pool = super::ConnectionPool::new(2, 3, true, &cfg);
         assert_eq!(pool.init(), true);
         let pool_shared = Arc::new(pool);
@@ -494,7 +497,7 @@ pub mod tests {
 
             });
         }
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_millis(500));
         info!("test_acquire_release_multithread_2 out of for loop :{}",
               pool_shared.idle_conns_count());
         assert_eq!(pool_shared.idle_conns_count(), 2);
