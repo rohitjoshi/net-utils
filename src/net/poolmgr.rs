@@ -94,6 +94,7 @@ impl ConnectionPool {
     }
 
 
+
     ///Releae connection
     #[allow(dead_code)]
     pub fn release(&self, conn: conn::Connection) {
@@ -363,7 +364,7 @@ pub mod tests {
         sleep(Duration::from_millis(1000));
         let pool = super::ConnectionPool::new(2, 5, true, &cfg);
         let pool_shared = Arc::new(pool);
-        for _ in 0u32..6 {
+        for _ in 0u32..5 {
             let pool = pool_shared.clone();
             thread::spawn(move || {
                 let mut conn = pool.acquire().unwrap();
@@ -378,7 +379,7 @@ pub mod tests {
                 pool.release(conn);
             });
         }
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_millis(5000));
         assert_eq!(pool_shared.idle_conns_count(), 5);
         pool_shared.release_all();
         assert_eq!(pool_shared.idle_conns_count(), 0);
