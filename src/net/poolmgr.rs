@@ -360,6 +360,7 @@ pub mod tests {
         thread::spawn(move || {
             listen_ip4_localhost(listen_port, rx);
         });
+        sleep(Duration::from_millis(1000));
         let pool = super::ConnectionPool::new(2, 5, true, &cfg);
         let pool_shared = Arc::new(pool);
         for _ in 0u32..6 {
@@ -478,7 +479,7 @@ pub mod tests {
         thread::spawn(move || {
             listen_ip4_localhost(listen_port, rx);
         });
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_millis(2000));
         let pool = super::ConnectionPool::new(2, 3, true, &cfg);
         assert_eq!(pool.init(), true);
         let pool_shared = Arc::new(pool);
