@@ -5,3 +5,9 @@ rust:
 matrix:
   allow_failures:
     - rust: nightly
+script:
+  cargo build --verbose
+  cargo test --verbose
+  cargo clean
+  cargo build --features ssl --verbose 
+  cargo test --features ssl --verbose
