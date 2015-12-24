@@ -439,7 +439,7 @@ pub mod tests {
                 listen_ip4_localhost(listen_port, rx);
             });
 
-            sleep(Duration::from_millis(1000));
+            sleep(Duration::from_millis(2000));
 
             let pool = super::ConnectionPool::new(2, 10, true, &cfg);
             assert_eq!(pool.init(), true);
