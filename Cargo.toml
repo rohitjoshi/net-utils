@@ -7,7 +7,6 @@ repository = "https://github.com/rohitjoshi/net-utils"
 readme = "README.md"
 keywords = ["connection-pool", "TCP", "SSL"]
 license = "MIT OR Apache-2.0"
-license-file = "LICENSE-Apache"
 include = [
     "**/*.rs",
     "Cargo.toml",
