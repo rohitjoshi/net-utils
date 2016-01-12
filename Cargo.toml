@@ -1,6 +1,6 @@
 [package]
 name = "net-utils"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Rohit Joshi <rohit.joshi@gmail.com>"]
 description = "Network utility library which provides client connection pool for TCP/SSL connctions"
 repository = "https://github.com/rohitjoshi/net-utils"
