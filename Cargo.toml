@@ -2,6 +2,7 @@
 name = "net-utils"
 version = "0.0.1"
 authors = ["Rohit Joshi <rohit.joshi@gmail.com>"]
+license = "MIT OR Apache-2.0"
 
 
 [features]
