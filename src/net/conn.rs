@@ -74,6 +74,11 @@ impl Connection {
             Connection::connect_internal(&self.config)
         }
     }
+    
+    /// Get the connection id
+    pub fn id(&self) -> &String {
+        &self.id
+    }
 
     /// Is Valid connection
     pub fn is_valid(&self) -> bool {
@@ -236,7 +241,7 @@ impl Write for NetStream {
 impl Drop for Connection {
     ///drop method
     fn drop(&mut self) {
-        info!("Drop for Connection:Dropping connection!");
+        info!("Drop for Connection:Dropping connection id: {}", self.id.clone());
         match self.reader.get_mut() {
             &mut NetStream::UnsecuredTcpStream(ref mut stream) => {
                 stream.shutdown(Shutdown::Read);

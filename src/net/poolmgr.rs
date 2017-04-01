@@ -6,8 +6,10 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::default::Default;
 
+
 use net::conn;
 use net::config;
+
 
 /// ConnectionPool which provide pooling capability for Connection objects
 /// It has support for max number of connections with temporary allowable connections
@@ -64,15 +66,18 @@ impl ConnectionPool {
         for i in 0..self.min_conns {
             info!("*****Init:Creating connection {}", i);
             let  conn = conn::Connection::connect(&self.config);
+
             let host: &str = &self.config.server.clone().unwrap();
             let port = &self.config.port.unwrap();
+           
             match conn {
                 Ok(c) => {
+                    let id = c.id().clone();
                     self.idle_conns.lock().unwrap().push_back(c);
-                    error!("Connection id:{}, Connecting to server {}:{}", i, host, port);
+                    info!("Connection id:{}, Connecting to server {}:{}", id, host, port);
                 },
                 Err(e) => {
-                    info!("Connection id:{}, Connecting to server {}:{}", i, host, port);
+                    
                     error!("Connection id: Failed to create a connection to {}:{}. Error: {}",
                     host, port,e);
                     return false;
@@ -98,25 +103,34 @@ impl ConnectionPool {
     ///Releae connection
     #[allow(dead_code)]
     pub fn release(&self, conn: conn::Connection) {
-        let idle_count = self.idle_conns.lock().unwrap().len();
-        info!("release(): idle connection: {}", idle_count);
-        if idle_count < self.min_conns && conn.is_valid() {
+        let a = self.idle_conns.lock();
+        let conn_inuse = self.conns_inuse.load(Ordering::Relaxed);
+        let id = conn.id().clone();
+        let is_valid = conn.is_valid();
+        
+        let idle_count = a.unwrap().len();
+        let total = idle_count  + conn_inuse;
+        
+        info!("release(): conn id:{}, min_conn:{}, idle connection: {}, connection in use:{},  total: {}", id, self.min_conns, idle_count, conn_inuse, total);
+        
+        if total < self.min_conns  && is_valid {
             info!("Pushing back to ideal_conns");
             self.idle_conns.lock().unwrap().push_back(conn);
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
-        } else if !conn.is_valid() {
-
+            return;
+        } 
+        if !is_valid {
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
             info!("Connection not valid. It should trigger drop connection");
         } else {
-
+            //drop(conn);
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
-            info!("It should trigger drop connection");
+            info!("conn id:{}:It should trigger drop connection from inuse", id);
         }
-
         info!("release() end: Total_count: {}",
               self.idle_conns.lock().unwrap().len() + self.conns_inuse.load(Ordering::Relaxed));
-
+              
+        let _ = a;  
     }
 
     /// Drop connection.  Use only if disconect.
@@ -158,6 +172,7 @@ impl ConnectionPool {
         let conn = conn::Connection::connect(&self.config);
         match conn {
             Ok(c) => {
+                info!("New connection id:{}", c.id().clone());
                 self.conns_inuse.fetch_add(1, Ordering::Relaxed);
                 return Ok(c);
             }
@@ -183,7 +198,6 @@ pub mod tests {
     // use std::io::{Read, Write};
     // use std::old_io;
     // use std::test;
-    // use log;
     extern crate env_logger;
     use std::thread::sleep;
     use std::time::Duration;
@@ -238,7 +252,7 @@ pub mod tests {
                 // return result;
                 break;
             } else {
-                warn!("handle_client: Received: {}. Sending it back",
+                debug!("handle_client: Received: {}. Sending it back",
                       str::from_utf8(&buf).unwrap());
                 let result = stream.write(&buf[0..got]);
                 // return result;
@@ -295,7 +309,7 @@ pub mod tests {
             println!("Received {}", buffer);
         }
         pool.release(conn);
-        assert_eq!(pool.idle_conns_count(), 2);
+        assert_eq!(pool.idle_conns_count(), 1);
         info!("test_lib ended---------");
 
     }
@@ -354,6 +368,7 @@ pub mod tests {
     fn test_example() {
 
         info!("test_example started---------");
+     //   env_logger::init().unwrap();
         let mut cfg: config::Config = Default::default();
         cfg.port = Some(next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
@@ -362,26 +377,41 @@ pub mod tests {
         thread::spawn(move || {
             listen_ip4_localhost(listen_port, rx);
         });
-        sleep(Duration::from_millis(1000));
+        
         let pool = super::ConnectionPool::new(2, 5, true, &cfg);
         let pool_shared = Arc::new(pool);
+        let mut ts = Vec::new();
+       
         for _ in 0u32..6 {
             let pool = pool_shared.clone();
-            thread::spawn(move || {
-                let mut conn = pool.acquire().unwrap();
-
+            let t = thread::spawn(move || {
+                warn!("test_example error---------");
+                let mut conn =   pool.acquire().unwrap(); 
+                warn!("test_example error---------");
                 conn.writer.write("GET google.com\r\n".as_bytes());
                 conn.writer.flush();
                 let mut buffer = String::new();
                 let r = conn.reader.read_line(&mut buffer);
-                if r.unwrap() > 0 {
-                    println!("Received {}", buffer);
+                match r {
+                    Ok(v) => {
+                     if v > 0 {
+                        println!("Received {}", buffer);
+                     }
+                    },
+                    Err(e) => println!("error : {:?}", e),
+
                 }
                 pool.release(conn);
             });
+            ts.push(t);
+        }
+        let l = ts.len();
+        for _ in 0..l {
+            let t = ts.pop();
+            t.unwrap().join();
         }
         sleep(Duration::from_millis(500));
-        assert_eq!(pool_shared.idle_conns_count(), 2);
+        assert_eq!(pool_shared.idle_conns_count(), 1);
         pool_shared.release_all();
         assert_eq!(pool_shared.idle_conns_count(), 0);
         tx.send(0);
@@ -416,11 +446,11 @@ pub mod tests {
             assert_eq!(pool.idle_conns_count(), 0);
             let c3 = pool.acquire().unwrap();
             pool.release(c1);
-            assert_eq!(pool.idle_conns_count(), 1);
+            assert_eq!(pool.idle_conns_count(), 0);
             pool.release(c2);
-            assert_eq!(pool.idle_conns_count(), 2);
+            assert_eq!(pool.idle_conns_count(), 0);
             pool.release(c3);
-            assert_eq!(pool.idle_conns_count(), 2);
+            assert_eq!(pool.idle_conns_count(), 1);
 
             pool.release_all();
             assert_eq!(pool.idle_conns_count(), 0);
@@ -461,7 +491,7 @@ pub mod tests {
                 });
             }
             sleep(Duration::from_millis(2000));
-            assert_eq!(pool_shared.idle_conns_count(), 2);
+            assert_eq!(pool_shared.idle_conns_count(), 1);
             pool_shared.release_all();
             assert_eq!(pool_shared.idle_conns_count(), 0);
             tx.send(0);
@@ -500,7 +530,7 @@ pub mod tests {
         sleep(Duration::from_millis(500));
         info!("test_acquire_release_multithread_2 out of for loop :{}",
               pool_shared.idle_conns_count());
-        assert_eq!(pool_shared.idle_conns_count(), 2);
+        assert_eq!(pool_shared.idle_conns_count(), 1);
         pool_shared.release_all();
         assert_eq!(pool_shared.idle_conns_count(), 0);
         tx.send(0);
