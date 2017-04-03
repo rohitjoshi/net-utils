@@ -201,7 +201,7 @@ pub mod tests {
     extern crate env_logger;
     use std::thread::sleep;
     use std::time::Duration;
-    use std::path::Path;
+    //use std::path::Path;
 
 
 
@@ -545,7 +545,7 @@ pub mod tests {
         info!("test_init_ssl started---------");
         let mut cfg: config::Config = Default::default();
         cfg.port = Some(443);
-        cfg.server = Some("goog.com".to_string());
+        cfg.server = Some("google.com".to_string());
         cfg.use_ssl = Some(true);
        
        // cfg.server = Some("google.com".to_string());
