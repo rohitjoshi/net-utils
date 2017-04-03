@@ -547,6 +547,7 @@ pub mod tests {
         cfg.port = Some(443);
         cfg.server = Some("google.com".to_string());
         cfg.use_ssl = Some(true);
+        cfg.verify= Some(true);
        
        // cfg.server = Some("google.com".to_string());
         let pool = super::ConnectionPool::new(2, 5, false, &cfg);

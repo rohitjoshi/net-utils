@@ -2,6 +2,10 @@ language: rust
 rust:
   - stable
   - nightly
+env:
+  global:
+    - BUILD_OPENSSL_VERSION=1.0.1k
+
 matrix:
   allow_failures:
     - rust: nightly

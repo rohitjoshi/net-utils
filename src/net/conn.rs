@@ -134,14 +134,15 @@ impl Connection {
         let host: &str = &config.server.clone().unwrap();
         let port = config.port.unwrap();
         info!("Connecting to server {}:{}", host, port);
-        // let mut socket = try!(TcpStream::connect(format!("{}:{}", server, port)[]));
-        let reader_socket = try!(TcpStream::connect((host, port)));
-         let writer_socket = try!(reader_socket.try_clone());
+        //let mut socket = try!(TcpStream::connect(format!("{}:{}", server, port)[]));
+        let socket = try!(TcpStream::connect((host, port)));
+        // let writer_socket = try!(reader_socket.try_clone());
         //reader_socket.set_timeout(config.connect_timeout);
         // writer_socket.set_timeout(config.connect_timeout);
         
         let mut ctx = try!(ssl_to_io(SslContext::builder(SslMethod::tls())));
         
+         ctx.set_default_verify_paths().unwrap();
 
         // verify peer
         if config.verify.unwrap_or(false) {
@@ -163,18 +164,11 @@ impl Connection {
         if config.ca_file.is_some() {
             try!(ssl_to_io(ctx.set_ca_file(config.ca_file.as_ref().unwrap())));
         }
-        let ctx_x = ctx.build();
-        error!("HERE");
-        let ssl_read = Ssl::new(&ctx_x).unwrap();
-        let ssl_write = Ssl::new(&ctx_x).unwrap();
-        //let read_socket = try!(socket.try_clone());
-        
-        error!("HERE1");
-        let ssl_read_socket =  ssl_read.connect(reader_socket).unwrap();
-        error!("HERE2");
+        let ssl_context = ctx.build();
        
-       let ssl_write_socket = ssl_write.connect(writer_socket).unwrap();
-        error!("HERE3");
+        let ssl_read_socket = Ssl::new(&ssl_context).unwrap().connect(try!(socket.try_clone())).unwrap();
+        let ssl_write_socket = Ssl::new(&ssl_context).unwrap().connect(socket).unwrap();
+
         Ok(Connection::new(BufReader::new(NetStream::SslTcpStream(ssl_read_socket)),
                            BufWriter::new(NetStream::SslTcpStream(ssl_write_socket)),
                            config))
