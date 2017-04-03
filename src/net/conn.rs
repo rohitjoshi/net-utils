@@ -14,17 +14,17 @@ use std::net::Shutdown;
 use std::os::unix::prelude::AsRawFd;
 
 #[cfg(feature = "ssl")]
-use openssl::ssl::{SslContext, SslMethod, SslStream, SSL_VERIFY_PEER};
+use openssl::ssl::{SslContext, Ssl, SslMethod, SslStream, SSL_VERIFY_PEER};
 #[cfg(feature = "ssl")]
-use openssl::ssl::error::SslError;
+use openssl::error::ErrorStack;
 #[cfg(feature = "ssl")]
 use openssl::x509;
+
 // use std::bool;
 use net::config;
 use uuid::Uuid;
 
 // pub mod config;
-
 
 /// A Connection object.  Make sure you syncronize if uses in multiple threads
 pub struct Connection {
@@ -86,10 +86,9 @@ impl Connection {
             &NetStream::UnsecuredTcpStream(ref tcp) => {
                 debug!("TCP FD:{}", tcp.as_raw_fd());
                 if tcp.as_raw_fd() < 0 {
-
-                    return false;
+                     false
                 } else {
-                    return true;
+                     true
                 }
             }
             #[cfg(feature = "ssl")]
@@ -136,36 +135,48 @@ impl Connection {
         let port = config.port.unwrap();
         info!("Connecting to server {}:{}", host, port);
         // let mut socket = try!(TcpStream::connect(format!("{}:{}", server, port)[]));
-        let socket = try!(TcpStream::connect((host, port)));
-        // socket.set_timeout(config.connect_timeout);
-        let mut ssl = try!(ssl_to_io(SslContext::new(SslMethod::Tlsv1)));
+        let reader_socket = try!(TcpStream::connect((host, port)));
+         let writer_socket = try!(reader_socket.try_clone());
+        //reader_socket.set_timeout(config.connect_timeout);
+        // writer_socket.set_timeout(config.connect_timeout);
+        
+        let mut ctx = try!(ssl_to_io(SslContext::builder(SslMethod::tls())));
+        
 
         // verify peer
         if config.verify.unwrap_or(false) {
-            ssl.set_verify(SSL_VERIFY_PEER, None);
+            ctx.set_verify(SSL_VERIFY_PEER);
         }
 
         // verify depth
         if config.verify_depth.unwrap_or(0) > 0 {
-            ssl.set_verify_depth(config.verify_depth.unwrap());
+            ctx.set_verify_depth(config.verify_depth.unwrap());
         }
         if config.certificate_file.is_some() {
-        try!(ssl_to_io(ssl.set_certificate_file(config.certificate_file.as_ref().unwrap(),
-                                           x509::X509FileType::PEM)));
+        try!(ssl_to_io(ctx.set_certificate_file(config.certificate_file.as_ref().unwrap(),
+                                           x509::X509_FILETYPE_PEM)));
         }
         if config.private_key_file.is_some() {
-            try!(ssl_to_io(ssl.set_private_key_file(config.private_key_file.as_ref().unwrap(),
-                                                           x509::X509FileType::PEM)));
+            try!(ssl_to_io(ctx.set_private_key_file(config.private_key_file.as_ref().unwrap(),
+                                                           x509::X509_FILETYPE_PEM)));
         }
         if config.ca_file.is_some() {
-            try!(ssl_to_io(ssl.set_CA_file(config.ca_file.as_ref().unwrap())));
+            try!(ssl_to_io(ctx.set_ca_file(config.ca_file.as_ref().unwrap())));
         }
-
-
-        let ssl_socket = try!(ssl_to_io(SslStream::connect(&ssl, socket)));
-        let read_sock = try!(ssl_socket.try_clone());
-        Ok(Connection::new(BufReader::new(NetStream::SslTcpStream(read_sock)),
-                           BufWriter::new(NetStream::SslTcpStream(ssl_socket)),
+        let ctx_x = ctx.build();
+        error!("HERE");
+        let ssl_read = Ssl::new(&ctx_x).unwrap();
+        let ssl_write = Ssl::new(&ctx_x).unwrap();
+        //let read_socket = try!(socket.try_clone());
+        
+        error!("HERE1");
+        let ssl_read_socket =  ssl_read.connect(reader_socket).unwrap();
+        error!("HERE2");
+       
+       let ssl_write_socket = ssl_write.connect(writer_socket).unwrap();
+        error!("HERE3");
+        Ok(Connection::new(BufReader::new(NetStream::SslTcpStream(ssl_read_socket)),
+                           BufWriter::new(NetStream::SslTcpStream(ssl_write_socket)),
                            config))
 
     }
@@ -174,7 +185,7 @@ impl Connection {
 
 /// Converts a Result<T, SslError> isizeo an Result<T>.
 #[cfg(feature = "ssl")]
-fn ssl_to_io<T>(res: StdResult<T, SslError>) -> Result<T> {
+fn ssl_to_io<T>(res: StdResult<T, ErrorStack>) -> Result<T> {
     match res {
         Ok(x) => Ok(x),
         Err(e) => {

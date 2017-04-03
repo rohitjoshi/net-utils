@@ -17,6 +17,7 @@
 #![allow(unused_must_use)]
 #[cfg(feature = "ssl")]
 extern crate openssl;
+
 #[macro_use]
 extern crate log;
 extern crate time;

@@ -201,6 +201,7 @@ pub mod tests {
     extern crate env_logger;
     use std::thread::sleep;
     use std::time::Duration;
+    use std::path::Path;
 
 
 
@@ -544,11 +545,28 @@ pub mod tests {
         info!("test_init_ssl started---------");
         let mut cfg: config::Config = Default::default();
         cfg.port = Some(443);
-        cfg.server = Some("google.com".to_string());
-
+        cfg.server = Some("goog.com".to_string());
         cfg.use_ssl = Some(true);
+       
+       // cfg.server = Some("google.com".to_string());
         let pool = super::ConnectionPool::new(2, 5, false, &cfg);
         assert_eq!(pool.init(), true);
+        let mut conn =   pool.acquire().unwrap(); 
+        warn!("test_example error---------");
+        conn.writer.write("GET google.com\r\n".as_bytes());
+        conn.writer.flush();
+        let mut buffer = String::new();
+        let r = conn.reader.read_line(&mut buffer);
+        match r {
+            Ok(v) => {
+                     if v > 0 {
+                        println!("Received {}", buffer);
+                     }
+                    },
+            Err(e) => println!("error : {:?}", e),
+
+        }
+        pool.release(conn);
 
         pool.release_all();
         assert_eq!(pool.idle_conns_count(), 0);

@@ -15,6 +15,8 @@ pub struct Config {
     pub connect_timeout: Option<u64>,
     ///If true, it will assume ssl is enabled
     pub use_ssl: Option<bool>,
+    /// SSL Protocol
+    //pub ssl_protocol : Option<>,
     /// Certificate File
     pub certificate_file: Option<PathBuf>,
     /// Private Key File
@@ -34,6 +36,7 @@ impl Default for Config {
             port: Some(21950),
             connect_timeout: Some(30_000),
             use_ssl: Some(false),
+           // ssl_protocol: 
             certificate_file: None,
             private_key_file: None,
             ca_file: None,
