@@ -16,8 +16,7 @@ use std::net::Shutdown;
 use std::os::unix::prelude::AsRawFd;
 
 #[cfg(feature = "ssl")]
-use openssl::ssl::{HandshakeError, SslConnectorBuilder, SslContextBuilder, SslContext, Ssl,
-                   SslMethod, SslStream, SSL_VERIFY_PEER, SSL_VERIFY_NONE};
+use openssl::ssl::{SslConnectorBuilder, SslMethod, SslStream, SSL_VERIFY_PEER, SSL_VERIFY_NONE};
 #[cfg(feature = "ssl")]
 use openssl::error::ErrorStack;
 #[cfg(feature = "ssl")]
