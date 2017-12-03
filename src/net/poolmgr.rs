@@ -41,11 +41,12 @@ impl Default for ConnectionPool {
 /// Connection pool implementation
 impl ConnectionPool {
     /// New instance
-    pub fn new(pool_min_size: usize,
-               pool_max_size: usize,
-               tmp_allowed: bool,
-               conn_config: &config::Config)
-               -> ConnectionPool {
+    pub fn new(
+        pool_min_size: usize,
+        pool_max_size: usize,
+        tmp_allowed: bool,
+        conn_config: &config::Config,
+    ) -> ConnectionPool {
         ConnectionPool {
             idle_conns: Mutex::new(VecDeque::new()),
             min_conns: pool_min_size,
@@ -65,21 +66,30 @@ impl ConnectionPool {
         self.idle_conns.lock().unwrap().reserve(self.max_conns);
         for i in 0..self.min_conns {
             info!("*****Init:Creating connection {}", i);
-            let  conn = conn::Connection::connect(&self.config);
+            let conn = conn::Connection::connect(&self.config);
 
             let host: &str = &self.config.server.clone().unwrap();
             let port = &self.config.port.unwrap();
-           
+
             match conn {
                 Ok(c) => {
                     let id = c.id().clone();
                     self.idle_conns.lock().unwrap().push_back(c);
-                    info!("Connection id:{}, Connecting to server {}:{}", id, host, port);
-                },
+                    info!(
+                        "Connection id:{}, Connecting to server {}:{}",
+                        id,
+                        host,
+                        port
+                    );
+                }
                 Err(e) => {
-                    
-                    error!("Connection id: Failed to create a connection to {}:{}. Error: {}",
-                    host, port,e);
+
+                    error!(
+                        "Failed to create a connection to {}:{}. Error: {}",
+                        host,
+                        port,
+                        e
+                    );
                     return false;
                 }
             }
@@ -94,7 +104,7 @@ impl ConnectionPool {
         self.idle_conns.lock().unwrap().clear();
         self.conns_inuse.store(0, Ordering::Relaxed);
         let total_count = self.idle_conns.lock().unwrap().len() +
-                          self.conns_inuse.load(Ordering::Relaxed);
+            self.conns_inuse.load(Ordering::Relaxed);
         info!("release_all called: Total_count: {}", total_count);
     }
 
@@ -107,38 +117,52 @@ impl ConnectionPool {
         let conn_inuse = self.conns_inuse.load(Ordering::Relaxed);
         let id = conn.id().clone();
         let is_valid = conn.is_valid();
-        
+
         let idle_count = a.unwrap().len();
-        let total = idle_count  + conn_inuse;
-        
-        info!("release(): conn id:{}, min_conn:{}, idle connection: {}, connection in use:{},  total: {}", id, self.min_conns, idle_count, conn_inuse, total);
-        
-        if total < self.min_conns  && is_valid {
+        let total = idle_count + conn_inuse;
+
+        info!(
+            "release(): conn id:{}, min_conn:{}, idle connection: {}, connection in use:{},  total: {}",
+            id,
+            self.min_conns,
+            idle_count,
+            conn_inuse,
+            total
+        );
+
+        if total < self.min_conns && is_valid {
             info!("Pushing back to ideal_conns");
             self.idle_conns.lock().unwrap().push_back(conn);
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
             return;
-        } 
+        }
         if !is_valid {
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
             info!("Connection not valid. It should trigger drop connection");
         } else {
             //drop(conn);
             self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
-            info!("conn id:{}:It should trigger drop connection from inuse", id);
+            info!(
+                "conn id:{}:It should trigger drop connection from inuse",
+                id
+            );
         }
-        info!("release() end: Total_count: {}",
-              self.idle_conns.lock().unwrap().len() + self.conns_inuse.load(Ordering::Relaxed));
-              
-        let _ = a;  
+        info!(
+            "release() end: Total_count: {}",
+            self.idle_conns.lock().unwrap().len() + self.conns_inuse.load(Ordering::Relaxed)
+        );
+
+        let _ = a;
     }
 
     /// Drop connection.  Use only if disconect.
     #[allow(unused_variables)]
     pub fn drop(&self, conn: conn::Connection) {
         self.conns_inuse.fetch_sub(1, Ordering::Relaxed);
-        warn!("drop() end: Total_count: {}",
-              self.idle_conns.lock().unwrap().len() + self.conns_inuse.load(Ordering::Relaxed));
+        warn!(
+            "drop() end: Total_count: {}",
+            self.idle_conns.lock().unwrap().len() + self.conns_inuse.load(Ordering::Relaxed)
+        );
 
     }
 
@@ -160,11 +184,13 @@ impl ConnectionPool {
             info!("Allocating new connection");
             let total_count = conns.len() + self.conns_inuse.load(Ordering::Relaxed);
             if total_count >= self.max_conns && self.tmp_conn_allowed == false {
-                return Err(Error::new(ErrorKind::Other,
-                                      // desc: "No connection available",
-                                      "Max pool size has reached and temporary connections are \
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    // desc: "No connection available",
+                    "Max pool size has reached and temporary connections are \
                                        not allowed."
-                                          .to_string()));
+                        .to_string(),
+                ));
 
             }
         }
@@ -253,8 +279,10 @@ pub mod tests {
                 // return result;
                 break;
             } else {
-                debug!("handle_client: Received: {}. Sending it back",
-                      str::from_utf8(&buf).unwrap());
+                debug!(
+                    "handle_client: Received: {}. Sending it back",
+                    str::from_utf8(&buf).unwrap()
+                );
                 let result = stream.write(&buf[0..got]);
                 // return result;
                 //    Ok(result)
@@ -332,8 +360,10 @@ pub mod tests {
             let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
             info!("test_init spawning thread---------");
             thread::spawn(move || {
-                info!("test_init calling listen_Ip4_localhost with port {}",
-                      listen_port);
+                info!(
+                    "test_init calling listen_Ip4_localhost with port {}",
+                    listen_port
+                );
                 listen_ip4_localhost(listen_port, rx);
             });
             sleep(Duration::from_millis(500));
@@ -369,25 +399,23 @@ pub mod tests {
     fn test_example() {
 
         info!("test_example started---------");
-     //   env_logger::init().unwrap();
+        //   env_logger::init().unwrap();
         let mut cfg: config::Config = Default::default();
         cfg.port = Some(next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
         let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
-        thread::spawn(move || {
-            listen_ip4_localhost(listen_port, rx);
-        });
-        
+        thread::spawn(move || { listen_ip4_localhost(listen_port, rx); });
+
         let pool = super::ConnectionPool::new(2, 5, true, &cfg);
         let pool_shared = Arc::new(pool);
         let mut ts = Vec::new();
-       
+
         for _ in 0u32..6 {
             let pool = pool_shared.clone();
             let t = thread::spawn(move || {
                 warn!("test_example error---------");
-                let mut conn =   pool.acquire().unwrap(); 
+                let mut conn = pool.acquire().unwrap();
                 warn!("test_example error---------");
                 conn.writer.write("GET google.com\r\n".as_bytes());
                 conn.writer.flush();
@@ -395,10 +423,10 @@ pub mod tests {
                 let r = conn.reader.read_line(&mut buffer);
                 match r {
                     Ok(v) => {
-                     if v > 0 {
-                        println!("Received {}", buffer);
-                     }
-                    },
+                        if v > 0 {
+                            println!("Received {}", buffer);
+                        }
+                    }
                     Err(e) => println!("error : {:?}", e),
 
                 }
@@ -426,13 +454,11 @@ pub mod tests {
         info!("test_acquire_release started---------");
         let mut cfg: config::Config = Default::default();
 
-        cfg.port = Some(next_test_port() );
+        cfg.port = Some(next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
         let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
-        thread::spawn(move || {
-            listen_ip4_localhost(listen_port, rx);
-        });
+        thread::spawn(move || { listen_ip4_localhost(listen_port, rx); });
         sleep(Duration::from_millis(1000));
         {
             let pool = super::ConnectionPool::new(2, 2, true, &cfg);
@@ -471,9 +497,7 @@ pub mod tests {
         let listen_port = cfg.port.unwrap();
         let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
         {
-            thread::spawn(move || {
-                listen_ip4_localhost(listen_port, rx);
-            });
+            thread::spawn(move || { listen_ip4_localhost(listen_port, rx); });
 
             sleep(Duration::from_millis(1000));
 
@@ -507,13 +531,11 @@ pub mod tests {
 
         info!("test_acquire_release_multithread_2 started---------");
         let mut cfg: config::Config = Default::default();
-        cfg.port = Some(next_test_port() );
+        cfg.port = Some(next_test_port());
         cfg.server = Some("127.0.0.1".to_string());
         let listen_port = cfg.port.unwrap();
         let (tx, rx): (Sender<isize>, Receiver<isize>) = channel();
-        thread::spawn(move || {
-            listen_ip4_localhost(listen_port, rx);
-        });
+        thread::spawn(move || { listen_ip4_localhost(listen_port, rx); });
         sleep(Duration::from_millis(1000));
         let pool = super::ConnectionPool::new(2, 3, true, &cfg);
         assert_eq!(pool.init(), true);
@@ -529,8 +551,10 @@ pub mod tests {
             });
         }
         sleep(Duration::from_millis(500));
-        info!("test_acquire_release_multithread_2 out of for loop :{}",
-              pool_shared.idle_conns_count());
+        info!(
+            "test_acquire_release_multithread_2 out of for loop :{}",
+            pool_shared.idle_conns_count()
+        );
         assert_eq!(pool_shared.idle_conns_count(), 1);
         pool_shared.release_all();
         assert_eq!(pool_shared.idle_conns_count(), 0);
@@ -547,26 +571,37 @@ pub mod tests {
         cfg.port = Some(443);
         cfg.server = Some("google.com".to_string());
         cfg.use_ssl = Some(true);
-        cfg.verify= Some(true);
-       
-       // cfg.server = Some("google.com".to_string());
+        cfg.verify = Some(false);
+        cfg.read_timeout = Some(Duration::from_millis(5_000));
+
+        // cfg.server = Some("google.com".to_string());
         let pool = super::ConnectionPool::new(2, 5, false, &cfg);
         assert_eq!(pool.init(), true);
-        let mut conn =   pool.acquire().unwrap(); 
+        let mut conn = pool.acquire().unwrap();
+        assert_eq!(conn.is_valid(), true);
         warn!("test_example error---------");
-        conn.writer.write("GET google.com\r\n".as_bytes());
+        println!("test_init_ssl: sending GET request");
+        conn.writer.write("GET /index.html\r\n".as_bytes());
+        println!("test_init_ssl: flushing buffer");
         conn.writer.flush();
         let mut buffer = String::new();
-        let r = conn.reader.read_line(&mut buffer);
+        //let mut buffer_byte = [0; 10];
+
+        println!("test_init_ssl: reading a line");
+        let r = conn.reader.read_to_string(&mut buffer);
+        println!("test_init_ssl: printing read buffer");
         match r {
             Ok(v) => {
-                     if v > 0 {
-                        println!("Received {}", buffer);
-                     }
-                    },
-            Err(e) => println!("error : {:?}", e),
+                if v > 0 {
+                    println!("test_init_ssl:Received {}", buffer);
+                } else {
+                    println!("test_init_ssl:Received {}", v);
+                }
+            }
+            Err(e) => println!("test_init_ssl:error : {:?}", e),
 
         }
+        println!("test_init_ssl: releasing connection");
         pool.release(conn);
 
         pool.release_all();

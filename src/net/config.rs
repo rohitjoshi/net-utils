@@ -2,7 +2,7 @@
 //! #![unstable]
 use std::default::Default;
 use std::path::PathBuf;
-
+use std::time::Duration;
 
 ///Configuration data.
 #[derive(Clone)]
@@ -11,8 +11,10 @@ pub struct Config {
     pub server: Option<String>,
     /// The port to connect to.
     pub port: Option<u16>,
-    /// Connect timeout.
-    pub connect_timeout: Option<u64>,
+    /// Read timeout.
+    pub read_timeout: Option<Duration>,
+    /// Write timeout.
+    pub write_timeout: Option<Duration>,
     ///If true, it will assume ssl is enabled
     pub use_ssl: Option<bool>,
     /// SSL Protocol
@@ -34,7 +36,8 @@ impl Default for Config {
         Config {
             server: Some("localhost".to_string()),
             port: Some(21950),
-            connect_timeout: Some(30_000),
+            read_timeout: Some(Duration::from_millis(60_000)),
+            write_timeout: Some(Duration::from_millis(60_000)),
             use_ssl: Some(false),
            // ssl_protocol: 
             certificate_file: None,
@@ -49,6 +52,7 @@ impl Default for Config {
 #[cfg(test)]
 pub mod test {
     use std::default::Default;
+    use std::time::Duration;
     #[test]
     fn test_config() {
         let c = super::Config {
@@ -57,6 +61,6 @@ pub mod test {
             ..Default::default()
         };
         assert_eq!(c.port, Some(2195));
-        assert_eq!(c.connect_timeout, Some(30_000));
+        assert_eq!(c.read_timeout, Some(Duration::from_millis(60_000)));
     }
 }
